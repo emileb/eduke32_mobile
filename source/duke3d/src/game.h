@@ -303,6 +303,7 @@ extern char ror_protectedsectors[MAXSECTORS];
 #endif
 
 extern float r_ambientlight;
+extern int32_t r_pr_defaultlights;
 
 extern int32_t g_BenchmarkMode;
 extern int32_t g_Debug;
