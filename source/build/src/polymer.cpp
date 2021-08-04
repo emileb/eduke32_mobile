@@ -6247,8 +6247,11 @@ static void         polymer_prepareshadows(void)
             set_globalpos(prlights[i].x, prlights[i].y, prlights[i].z);
 
             // build globals used by rotatesprite
-            viewangle = fix16_from_int(prlights[i].angle);
-            set_globalang(fix16_from_int(prlights[i].angle));
+
+            viewangle = fix16_from_int(getangle(gx - prlights[i].x, gy - prlights[i].y));
+            set_globalang(viewangle);
+            //viewangle = fix16_from_int(prlights[i].angle);
+            //set_globalang(fix16_from_int(prlights[i].angle));
 
             oldoverridematerial = overridematerial;
             // smooth model shadows
