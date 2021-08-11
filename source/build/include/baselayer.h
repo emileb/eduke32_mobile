@@ -132,6 +132,7 @@ struct glinfo_t {
             int multitex         : 1;
             int occlusionqueries : 1;
             int rect             : 1;
+            int samplerobjects   : 1;
             int shadow           : 1;
             int sync             : 1;
             int texcompr         : 1;
