@@ -9006,6 +9006,7 @@ static void A_DoLight(int spriteNum)
             case FOOTPRINTS4__:
                 if (pSprite->pal != 8)
                     break;
+                fallthrough__;
             case BLOODPOOL__:
             {
                 uint32_t color;

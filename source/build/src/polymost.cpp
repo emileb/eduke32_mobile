@@ -94,15 +94,14 @@ static GLsync drawpolyVertsSync[3] = { 0 };
 static float defaultDrawpolyVertsArray[MAX_DRAWPOLY_VERTS*5];
 static float* drawpolyVerts = defaultDrawpolyVertsArray;
 
-struct glfiltermodes glfiltermodes[NUMGLFILTERMODES] =
-{
-    {"GL_NEAREST",GL_NEAREST,GL_NEAREST},
-    {"GL_LINEAR",GL_LINEAR,GL_LINEAR},
-    {"GL_NEAREST_MIPMAP_NEAREST",GL_NEAREST_MIPMAP_NEAREST,GL_NEAREST},
-    {"GL_LINEAR_MIPMAP_NEAREST",GL_LINEAR_MIPMAP_NEAREST,GL_LINEAR},
-    {"GL_NEAREST_MIPMAP_LINEAR",GL_NEAREST_MIPMAP_LINEAR,GL_NEAREST},
-    {"GL_LINEAR_MIPMAP_LINEAR",GL_LINEAR_MIPMAP_LINEAR,GL_LINEAR}
-};
+GLuint texsamplers[NUM_SAMPLERS];
+
+struct glfiltermodes glfiltermodes[NUMGLFILTERMODES] = { { "GL_NEAREST",                GL_NEAREST,                GL_NEAREST },
+                                                         { "GL_LINEAR",                 GL_LINEAR,                 GL_LINEAR  },
+                                                         { "GL_NEAREST_MIPMAP_NEAREST", GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST },
+                                                         { "GL_LINEAR_MIPMAP_NEAREST",  GL_LINEAR_MIPMAP_NEAREST,  GL_LINEAR  },
+                                                         { "GL_NEAREST_MIPMAP_LINEAR",  GL_NEAREST_MIPMAP_LINEAR,  GL_NEAREST },
+                                                         { "GL_LINEAR_MIPMAP_LINEAR",   GL_LINEAR_MIPMAP_LINEAR,   GL_LINEAR  } };
 
 int32_t glanisotropy = 0;            // 0 = maximum supported by card
 int32_t gltexfiltermode = TEXFILTER_OFF;
@@ -153,7 +152,10 @@ coltypef fogcol, fogtable[MAXPALOOKUPS];
 
 static uint32_t currentShaderProgramID = 0;
 static GLenum currentActiveTexture = 0;
+static polymostsampler currentBoundSampler[GL_TEXTURE16-GL_TEXTURE0];
 static uint32_t currentTextureID = 0;
+
+static FORCE_INLINE bool polymost_samplersEnabled(void) { return glinfo.samplerobjects && r_usesamplerobjects; }
 
 static GLuint quadVertsID = 0;
 #ifdef POLYMOST2
@@ -172,6 +174,7 @@ static GLint fogColorLoc = -1;
 
 #define PALSWAP_TEXTURE_SIZE 2048
 int32_t r_useindexedcolortextures = 1;
+int32_t r_usesamplerobjects = 1;
 static GLuint tilesheetTexIDs[MAXTILESHEETS];
 static GLint tilesheetSize = 0;
 static vec2f_t tilesheetHalfTexelSize = { 0.f, 0.f };
@@ -345,12 +348,88 @@ void gltexinvalidatetype(int32_t type)
 #endif
 }
 
+void polymost_resetSamplers()
+{
+    gltexfiltermode = clamp(gltexfiltermode, 0, NUMGLFILTERMODES-1);
+    auto &f = glfiltermodes[gltexfiltermode];
+
+    if (texsamplers[1] == 0)
+        glGenSamplers(NUM_SAMPLERS-1, &texsamplers[1]);
+
+    // common properties
+    for (int i = 1; i < ARRAY_SSIZE(texsamplers); i++)
+    {
+        auto &s = texsamplers[i];
+
+        glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, f.mag);
+        glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER, f.min);
+        glSamplerParameteri(s, GL_TEXTURE_BASE_LEVEL, 0);
+        glSamplerParameteri(s, GL_TEXTURE_MAX_LEVEL, 0);
+        glSamplerParameteri(s, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
+    }
+
+    GLuint s = texsamplers[SAMPLER_CLAMP];
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    s = texsamplers[SAMPLER_WRAP_T];
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+    s = texsamplers[SAMPLER_WRAP_S];
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    s = texsamplers[SAMPLER_NEAREST_CLAMP];
+    glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    s = texsamplers[SAMPLER_NEAREST_WRAP];
+    glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+}
+
+void polymost_bindSampler(int32_t const pth_method)
+{
+    if (!polymost_samplersEnabled())
+    {
+        currentBoundSampler[currentActiveTexture] = SAMPLER_NONE;
+        glBindSampler(currentActiveTexture, 0);
+        return;
+    }
+
+    if (currentShaderProgramID != polymost1CurrentShaderProgramID)
+        return;
+
+    polymostsampler samplerid = SAMPLER_WRAP_BOTH;
+
+    switch (pth_method & (PTH_INDEXED|PTH_CLAMPED))
+    {
+        case PTH_INDEXED:
+            samplerid = SAMPLER_NEAREST_WRAP;
+            break;
+        case PTH_INDEXED|PTH_CLAMPED:
+            samplerid = SAMPLER_NEAREST_CLAMP;
+            break;
+        case PTH_CLAMPED:
+            samplerid = SAMPLER_CLAMP;
+            break;
+    }
+
+    Bassert(glIsSampler(texsamplers[samplerid]));
+
+    if (currentBoundSampler[currentActiveTexture] != samplerid)
+    {
+        currentBoundSampler[currentActiveTexture] = samplerid;
+        glBindSampler(currentActiveTexture, texsamplers[samplerid]);
+    }
+}
+
 static void bind_2d_texture(GLuint texture, int filter)
 {
     if (filter == -1)
         filter = gltexfiltermode;
 
-    polymost_bindTexture(GL_TEXTURE_2D, texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, glfiltermodes[filter].mag);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, glfiltermodes[filter].min);
 #ifdef USE_GLEXT
@@ -371,7 +450,8 @@ void gltexapplyprops(void)
     }
 
     gltexfiltermode = clamp(gltexfiltermode, 0, NUMGLFILTERMODES-1);
-
+    polymost_resetSamplers();
+return;
     for (bssize_t i=0; i<=GLTEXCACHEADSIZ-1; i++)
     {
         for (pthtyp *pth=texcache.list[i]; pth; pth=pth->next)
@@ -973,9 +1053,9 @@ void polymost_glinit()
     drawpolyVertsOffset = 0;
     drawpolyVertsSubBufferIndex = 0;
 
-    GLuint ids[2];
-    glGenBuffers(2, ids);
-    drawpolyVertsID = ids[0];
+    GLuint bufferids[2];
+    glGenBuffers(2, bufferids);
+    drawpolyVertsID = bufferids[0];
     glBindBuffer(GL_ARRAY_BUFFER, drawpolyVertsID);
     if (persistentStreamBuffer)
     {
@@ -1003,6 +1083,9 @@ void polymost_glinit()
         tilesheetSize = 8192;
 #endif
     tilesheetHalfTexelSize = { 0.5f/tilesheetSize, 0.5f/tilesheetSize };
+
+    polymost_resetSamplers();
+
     vec2_t maxTexDimensions = { tilesheetSize, tilesheetSize };
     char allPacked = false;
     static int numTilesheets = 0;
@@ -1037,7 +1120,7 @@ void polymost_glinit()
     polymost_bindTexture(GL_TEXTURE_2D, tilesheetTexIDs[blankTile.tilesheetID]);
     uploadtextureindexed(false, {(int32_t) blankTile.rect.u, (int32_t) blankTile.rect.v}, {2, 2}, (intptr_t) blankTex);
 
-    quadVertsID = ids[1];
+    quadVertsID = bufferids[1];
     glBindBuffer(GL_ARRAY_BUFFER, quadVertsID);
     const float quadVerts[] =
         {
@@ -1914,14 +1997,13 @@ void uploadbasepalette(int32_t basepalnum)
     polymost_bindTexture(GL_TEXTURE_2D, paletteTextureIDs[basepalnum]);
     if (allocateTexture)
     {
-        const GLuint clamp_mode = glinfo.clamptoedge ? GL_CLAMP_TO_EDGE : GL_CLAMP;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_mode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp_mode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, basepalWFullBrightInfo);
     }
     else
@@ -1950,14 +2032,13 @@ void uploadpalswap(int32_t palookupnum)
     polymost_bindTexture(GL_TEXTURE_2D, palswapTextureID);
     if (allocateTexture)
     {
-        const GLuint clamp_mode = glinfo.clamptoedge ? GL_CLAMP_TO_EDGE : GL_CLAMP;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_mode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp_mode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, PALSWAP_TEXTURE_SIZE, PALSWAP_TEXTURE_SIZE, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
     }
 
@@ -1990,8 +2071,6 @@ static int32_t tile_is_sky(int32_t tilenum)
 
 static void polymost_setuptexture(const int32_t dameth, int filter)
 {
-    const GLuint clamp_mode = glinfo.clamptoedge ? GL_CLAMP_TO_EDGE : GL_CLAMP;
-
     gltexfiltermode = clamp(gltexfiltermode, 0, NUMGLFILTERMODES-1);
 
     if (filter == -1)
@@ -2014,14 +2093,14 @@ static void polymost_setuptexture(const int32_t dameth, int filter)
 
     if (!(dameth & DAMETH_CLAMPED))
     {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_if_tile_is_sky(dapic, clamp_mode));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_if_tile_is_sky(dapic, GL_CLAMP_TO_EDGE));
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     }
     else
     {
         // For sprite textures, clamping looks better than wrapping
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_mode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp_mode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 }
 
@@ -2069,35 +2148,18 @@ static void gloadtile_art_indexed(int32_t dapic, int32_t dameth, pthtyp *pth, in
         }
 
         if (doalloc)
-        {
             glGenTextures(1, (GLuint *)&pth->glpic);
-        }
+
         polymost_bindTexture(GL_TEXTURE_2D, pth->glpic);
 
         if (doalloc)
-        {
-            const GLuint clamp_mode = glinfo.clamptoedge ? GL_CLAMP_TO_EDGE : GL_CLAMP;
-            if (!(dameth & DAMETH_CLAMPED))
-            {
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_if_tile_is_sky(dapic, clamp_mode));
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            }
-            else
-            {
-                // For sprite textures, clamping looks better than wrapping
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_mode);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp_mode);
-            }
-        }
-
-        if (!doalloc &&
-            !tileIsPacked &&
-            (siz.x != pth->siz.x ||
-             siz.y != pth->siz.y))
+            polymost_setuptexture(dameth, -1);
+        else if (!tileIsPacked && siz != pth->siz)
         {
             //POGO: resize our texture to match the tile data
             doalloc = true;
         }
+
         uploadtextureindexed(doalloc, {(int32_t) tile.rect.u, (int32_t) tile.rect.v}, siz, waloff[dapic]);
     }
     else
@@ -3279,10 +3341,13 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
         else if (polymost_usetileshades())
             polymost_setFogEnabled(false);
 
-        if (drawpoly_srepeat)
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
-        if (drawpoly_trepeat)
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+        if (!polymost_samplersEnabled())
+        {
+            if (drawpoly_srepeat)
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            if (drawpoly_trepeat)
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        }
     }
 
     // texture scale by parkar request
@@ -3432,6 +3497,8 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
 
     glColor4f(pc[0], pc[1], pc[2], pc[3]);
 
+    polymost_bindSampler(pth->flags);
+
     //POGOTODO: remove this, replace it with a shader implementation
     //Hack for walls&masked walls which use textures that are not a power of 2
     if ((pow2xsplit) && (tsiz.x != tsiz2.x))
@@ -3577,6 +3644,7 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
             {
                 glBufferSubData(GL_ARRAY_BUFFER, drawpolyVertsOffset*sizeof(float)*5, nn*sizeof(float)*5, drawpolyVerts);
             }
+
             glDrawArrays(GL_TRIANGLE_FAN, drawpolyVertsOffset, nn);
             drawpolyVertsOffset += nn;
         }
@@ -3672,13 +3740,14 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
     else if (!nofog)
         polymost_setFogEnabled(true);
 
-    const GLuint clamp_mode = glinfo.clamptoedge ? GL_CLAMP_TO_EDGE : GL_CLAMP;
+    if (!polymost_samplersEnabled())
+    {
+        if (drawpoly_srepeat)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
-    if (drawpoly_srepeat)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_mode);
-
-    if (drawpoly_trepeat)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp_mode);
+        if (drawpoly_trepeat)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
 
     if (fullbright_pass == 1)
     {
@@ -10003,6 +10072,7 @@ void polymost_initosdfuncs(void)
         { "r_useindexedcolortextures", "enable/disable indexed color texture rendering (always disables r_texfilter and r_anisotropy)", (void *) &r_useindexedcolortextures, CVAR_BOOL, 0, 1 },
         { "r_usenewshading", "visibility/fog code: 0: orig. Polymost   1: 07/2011   2: linear 12/2012   3: no neg. start 03/2014   4: base constant on shade table 11/2017",
           (void *) &r_usenewshading, CVAR_INT|CVAR_FUNCPTR, 0, 4 },
+        { "r_usesamplerobjects", "enable/disable OpenGL sampler objects", (void *) &r_usesamplerobjects, CVAR_BOOL|CVAR_FUNCPTR, 0, 1 },
         { "r_usetileshades", "enable/disable apply shade tables to art tiles", (void *) &r_usetileshades, CVAR_BOOL, 0, 1 },
 
         { "r_vsync",
@@ -10040,7 +10110,7 @@ void polymost_initosdfuncs(void)
         { "r_pr_hudyadd", "overriden HUD yadd; see r_pr_overridehud", (void *) &pr_hudyadd, CVAR_FLOAT | CVAR_NOSAVE, -100, 100 },
         { "r_pr_hudzadd", "overriden HUD zadd; see r_pr_overridehud", (void *) &pr_hudzadd, CVAR_FLOAT | CVAR_NOSAVE, -100, 100 },
         { "r_pr_lighting", "enable/disable dynamic lights - restarts renderer", (void *) &pr_lighting, CVAR_INT | CVAR_RESTARTVID, 0, 2 },
-        { "r_pr_maxlightpasses", "the maximal amount of lights a single object can by affected by", (void *) &r_pr_maxlightpasses, CVAR_INT|CVAR_FUNCPTR, 0, PR_MAXLIGHTS },
+        { "r_pr_maxlightpasses", "the maximal amount of lights a single object can by affected by", (void *) &r_pr_maxlightpasses, CVAR_INT|CVAR_FUNCPTR, 0, PR_MAXPLANELIGHTS },
         { "r_pr_maxlightpriority", "lowering that value removes less meaningful lights from the scene", (void *) &pr_maxlightpriority, CVAR_INT, 0, PR_MAXLIGHTPRIORITY },
         { "r_pr_normalmapping", "enable/disable virtual displacement mapping", (void *) &pr_normalmapping, CVAR_BOOL, 0, 1 },
         { "r_pr_nullrender", "disable all draws when enabled, 2: disables updates too", (void *)&pr_nullrender, CVAR_INT | CVAR_NOSAVE, 0, 3 },

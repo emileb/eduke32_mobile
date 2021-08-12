@@ -318,6 +318,27 @@ static FORCE_INLINE bool polymost_testintersection(vec3_t const &pos, vec2_t con
 extern void polymost_setupglowtexture(int32_t texunits, int32_t tex);
 extern void polymost_setupdetailtexture(int32_t texunits, int32_t tex);
 
+enum polymostsampler
+{
+    SAMPLER_NONE,
+    SAMPLER_NEAREST_CLAMP,
+    SAMPLER_NEAREST_WRAP,
+    SAMPLER_CLAMP,
+    SAMPLER_WRAP_T,
+    SAMPLER_WRAP_S,
+    SAMPLER_WRAP_BOTH,
+    NUM_SAMPLERS
+};
+
+enum polymostsamplerflags {
+    SAMPLER_NEAREST,
+    SAMPLER_CLAMPED,
+};
+
+extern GLuint texsamplers[NUM_SAMPLERS];
+extern void polymost_resetSamplers();
+extern void polymost_bindSampler(int32_t);
+
 #ifdef __cplusplus
 }
 #endif

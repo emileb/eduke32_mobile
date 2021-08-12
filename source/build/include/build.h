@@ -1560,6 +1560,7 @@ extern int32_t glanisotropy;
 extern int32_t glusetexcompr;
 extern int32_t gltexfiltermode;
 extern int32_t r_useindexedcolortextures;
+extern int32_t r_usesamplerobjects;
 
 enum {
     TEXFILTER_OFF = 0, // GL_NEAREST
