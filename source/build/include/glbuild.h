@@ -64,37 +64,6 @@ extern bwglSetPixelFormatProcPtr bwglSetPixelFormat;
 #if defined DYNAMIC_GLU
 
 // GLU
-#if defined __clang__ && defined __APPLE__
-// XXX: OS X 10.9 deprecated GLUtesselator.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-typedef void             (APIENTRY * bgluTessBeginContourProcPtr)(GLUtesselator* tess);
-extern bgluTessBeginContourProcPtr bgluTessBeginContour;
-typedef void             (APIENTRY * bgluTessBeginPolygonProcPtr)(GLUtesselator* tess, GLvoid* data);
-extern bgluTessBeginPolygonProcPtr bgluTessBeginPolygon;
-typedef void             (APIENTRY * bgluTessCallbackProcPtr)(GLUtesselator* tess, GLenum which, void (PR_CALLBACK CallBackFuncProcPtr)());
-extern bgluTessCallbackProcPtr bgluTessCallback;
-typedef void             (APIENTRY * bgluTessEndContourProcPtr)(GLUtesselator* tess);
-extern bgluTessEndContourProcPtr bgluTessEndContour;
-typedef void             (APIENTRY * bgluTessEndPolygonProcPtr)(GLUtesselator* tess);
-extern bgluTessEndPolygonProcPtr bgluTessEndPolygon;
-typedef void             (APIENTRY * bgluTessNormalProcPtr)(GLUtesselator* tess, GLdouble valueX, GLdouble valueY, GLdouble valueZ);
-extern bgluTessNormalProcPtr bgluTessNormal;
-typedef void             (APIENTRY * bgluTessPropertyProcPtr)(GLUtesselator* tess, GLenum which, GLdouble data);
-extern bgluTessPropertyProcPtr bgluTessProperty;
-typedef void             (APIENTRY * bgluTessVertexProcPtr)(GLUtesselator* tess, GLdouble *location, GLvoid* data);
-extern bgluTessVertexProcPtr bgluTessVertex;
-typedef GLUtesselator*   (APIENTRY * bgluNewTessProcPtr)(void);
-extern bgluNewTessProcPtr bgluNewTess;
-typedef void             (APIENTRY * bgluDeleteTessProcPtr)(GLUtesselator* tess);
-extern bgluDeleteTessProcPtr bgluDeleteTess;
-
-#if defined __clang__ && defined __APPLE__
-#pragma clang diagnostic pop
-#endif
-
 typedef void             (APIENTRY * bgluPerspectiveProcPtr)(GLdouble fovy, GLdouble aspect, GLdouble zNear, GLdouble zFar);
 extern bgluPerspectiveProcPtr bgluPerspective;
 
@@ -107,17 +76,6 @@ typedef GLint            (APIENTRY * bgluUnProjectProcPtr)(GLdouble winX, GLdoub
 extern bgluUnProjectProcPtr bgluUnProject;
 
 #else
-
-#define bgluTessBeginContour gluTessBeginContour
-#define bgluTessBeginPolygon gluTessBeginPolygon
-#define bgluTessCallback gluTessCallback
-#define bgluTessEndContour gluTessEndContour
-#define bgluTessEndPolygon gluTessEndPolygon
-#define bgluTessNormal gluTessNormal
-#define bgluTessProperty gluTessProperty
-#define bgluTessVertex gluTessVertex
-#define bgluNewTess gluNewTess
-#define bgluDeleteTess gluDeleteTess
 
 #define bgluPerspective gluPerspective
 

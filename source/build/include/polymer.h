@@ -60,6 +60,7 @@ extern int32_t      pr_ati_textureformat_one;
 extern int32_t      pr_nullrender;
 
 extern int32_t      r_pr_maxlightpasses;
+extern int32_t      r_pr_constrained;
 
 // MATERIAL
 typedef enum {
@@ -254,10 +255,9 @@ typedef struct      s_prplane {
 
 typedef struct      s_prsector {
     // polymer data
-    GLdouble*       verts;
+    GLfloat*       verts;
     _prplane        floor;
     _prplane        ceil;
-    int16_t         curindice;
     int32_t         indicescount;
     int32_t         oldindicescount;
     // stuff
@@ -403,9 +403,6 @@ static void         polymer_freeboard(void);
 // SECTORS
 static int32_t      polymer_initsector(int16_t sectnum);
 static int32_t      polymer_updatesector(int16_t sectnum);
-void PR_CALLBACK    polymer_tesserror(GLenum error);
-void PR_CALLBACK    polymer_tessedgeflag(GLenum error);
-void PR_CALLBACK    polymer_tessvertex(void* vertex, void* sector);
 static int32_t      polymer_buildfloor(int16_t sectnum);
 static void         polymer_drawsector(int16_t sectnum, int32_t domasks);
 // WALLS

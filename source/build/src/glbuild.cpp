@@ -38,17 +38,6 @@ bwglSetPixelFormatProcPtr bwglSetPixelFormat;
 #if defined DYNAMIC_GLU
 
 // GLU
-bgluTessBeginContourProcPtr bgluTessBeginContour;
-bgluTessBeginPolygonProcPtr bgluTessBeginPolygon;
-bgluTessCallbackProcPtr bgluTessCallback;
-bgluTessEndContourProcPtr bgluTessEndContour;
-bgluTessEndPolygonProcPtr bgluTessEndPolygon;
-bgluTessNormalProcPtr bgluTessNormal;
-bgluTessPropertyProcPtr bgluTessProperty;
-bgluTessVertexProcPtr bgluTessVertex;
-bgluNewTessProcPtr bgluNewTess;
-bgluDeleteTessProcPtr bgluDeleteTess;
-
 bgluPerspectiveProcPtr bgluPerspective;
 
 bgluErrorStringProcPtr bgluErrorString;
@@ -213,17 +202,6 @@ int32_t loadglulibrary(const char *driver)
 
     glulibrary = Xstrdup(driver);
 
-    bgluTessBeginContour = (bgluTessBeginContourProcPtr) GLUGETPROC("gluTessBeginContour");
-    bgluTessBeginPolygon = (bgluTessBeginPolygonProcPtr) GLUGETPROC("gluTessBeginPolygon");
-    bgluTessCallback = (bgluTessCallbackProcPtr) GLUGETPROC("gluTessCallback");
-    bgluTessEndContour = (bgluTessEndContourProcPtr) GLUGETPROC("gluTessEndContour");
-    bgluTessEndPolygon = (bgluTessEndPolygonProcPtr) GLUGETPROC("gluTessEndPolygon");
-    bgluTessNormal = (bgluTessNormalProcPtr) GLUGETPROC("gluTessNormal");
-    bgluTessProperty = (bgluTessPropertyProcPtr) GLUGETPROC("gluTessProperty");
-    bgluTessVertex = (bgluTessVertexProcPtr) GLUGETPROC("gluTessVertex");
-    bgluNewTess = (bgluNewTessProcPtr) GLUGETPROC("gluNewTess");
-    bgluDeleteTess = (bgluDeleteTessProcPtr) GLUGETPROC("gluDeleteTess");
-
     bgluPerspective = (bgluPerspectiveProcPtr) GLUGETPROC("gluPerspective");
 
     bgluErrorString = (bgluErrorStringProcPtr) GLUGETPROC("gluErrorString");
@@ -255,17 +233,6 @@ int32_t unloadglulibrary(void)
     if (gluhandle) dlclose(gluhandle);
     gluhandle = NULL;
 #endif
-
-    bgluTessBeginContour = (bgluTessBeginContourProcPtr) NULL;
-    bgluTessBeginPolygon = (bgluTessBeginPolygonProcPtr) NULL;
-    bgluTessCallback = (bgluTessCallbackProcPtr) NULL;
-    bgluTessEndContour = (bgluTessEndContourProcPtr) NULL;
-    bgluTessEndPolygon = (bgluTessEndPolygonProcPtr) NULL;
-    bgluTessNormal = (bgluTessNormalProcPtr) NULL;
-    bgluTessProperty = (bgluTessPropertyProcPtr) NULL;
-    bgluTessVertex = (bgluTessVertexProcPtr) NULL;
-    bgluNewTess = (bgluNewTessProcPtr) NULL;
-    bgluDeleteTess = (bgluDeleteTessProcPtr) NULL;
 
     bgluPerspective = (bgluPerspectiveProcPtr) NULL;
 

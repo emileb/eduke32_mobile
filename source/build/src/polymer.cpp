@@ -11,6 +11,10 @@
 #include "xxhash.h"
 #include "texcache.h"
 
+#define LIBTESS2_IMPLEMENTATION
+
+#include "libtess2.h"
+
 // CVARS
 #ifdef __APPLE__
 int32_t pr_ati_textureformat_one = 0;
@@ -725,15 +729,7 @@ fix16_t         viewangle;
 int32_t         depth;
 _prmirror       mirrors[10];
 
-#if defined __clang__ && defined __APPLE__
-// XXX: OS X 10.9 deprecated GLUtesselator.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-GLUtesselator*  prtess;
-#if defined __clang__ && defined __APPLE__
-#pragma clang diagnostic pop
-#endif
+TESStesselator*  prtess;
 
 static int16_t  cursky;
 static char     curskypal;
@@ -770,10 +766,11 @@ int32_t             polymer_init(void)
     // clean up existing stuff since it will be initialized again if we're re-entering here
     polymer_uninit();
 
-    Bmemset(&prsectors[0], 0, sizeof(prsectors[0]) * MAXSECTORS);
-    Bmemset(&prwalls[0], 0, sizeof(prwalls[0]) * MAXWALLS);
+    Bmemset(&prsectors[0], 0, sizeof(prsectors));
+    Bmemset(&prwalls[0], 0, sizeof(prwalls));
 
-    prtess = bgluNewTess();
+    prtess = tessNewTess(nullptr);
+
     if (prtess == 0)
     {
         OSD_Printf("PR : Tessellation object initialization failed!\n");
@@ -869,7 +866,7 @@ void                polymer_uninit(void)
 
     if (prtess)
     {
-        bgluDeleteTess(prtess);
+        tessDeleteTess(prtess);
         prtess = NULL;
     }
 
@@ -2599,7 +2596,7 @@ static int32_t      polymer_initsector(int16_t sectnum)
     sec = (usectorptr_t)&sector[sectnum];
     s = (_prsector *)Xcalloc(1, sizeof(_prsector));
 
-    s->verts = (GLdouble *)Xcalloc(sec->wallnum, sizeof(GLdouble) * 3);
+    s->verts = (GLfloat *)Xcalloc(sec->wallnum, sizeof(GLfloat) * 3);
     s->floor.buffer = (_prvert *)Xcalloc(sec->wallnum, sizeof(_prvert));
     s->floor.vertcount = sec->wallnum;
     s->ceil.buffer = (_prvert *)Xcalloc(sec->wallnum, sizeof(_prvert));
@@ -2938,8 +2935,8 @@ finish:
                 glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, s->indicescount * sizeof(GLushort), s->ceil.indices);
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
             }
-            else needfloor = -1;
         }
+        else needfloor = -1;
     }
 
     if (wallinvalidate && needfloor != -1)
@@ -2958,6 +2955,7 @@ finish:
     return 0;
 }
 
+#if 0
 void PR_CALLBACK    polymer_tesserror(GLenum error)
 {
     /* This callback is called by the tesselator whenever it raises an error.
@@ -2988,11 +2986,10 @@ void PR_CALLBACK    polymer_tessvertex(void* vertex, void* sector)
     s->ceil.indices[s->curindice] = (intptr_t)vertex;
     s->curindice++;
 }
+#endif // 
 
-static int32_t polymer_buildfloor(int16_t sectnum)
+static int32_t      polymer_buildfloor(int16_t sectnum)
 {
-    Bassert((unsigned)sectnum < (unsigned)numsectors);
-
     // This function tesselates the floor/ceiling of a sector and stores the triangles in a display list.
     if (pr_verbosity >= 2) OSD_Printf("PR : Tesselating floor of sector %i...\n", sectnum);
 
@@ -3002,44 +2999,68 @@ static int32_t polymer_buildfloor(int16_t sectnum)
      if (s == NULL)
         return -1;
 
-    if (s->floor.indices == NULL)
+    int i=0, j=0, k=0;
+
+    tessSetOption(prtess, TESS_CONSTRAINED_DELAUNAY_TRIANGULATION, r_pr_constrained);
+
+    do
     {
-        s->indicescount = (max<int16_t>(3, sec->wallnum) - 2) * 3;
-        s->floor.indices = (GLushort *)Xcalloc(s->indicescount, sizeof(GLushort));
-        s->ceil.indices = (GLushort *)Xcalloc(s->indicescount, sizeof(GLushort));
-    }
-
-    s->curindice = 0;
-
-    bgluTessCallback(prtess, GLU_TESS_VERTEX_DATA, (void (PR_CALLBACK *)(void))polymer_tessvertex);
-    bgluTessCallback(prtess, GLU_TESS_EDGE_FLAG, (void (PR_CALLBACK *)(void))polymer_tessedgeflag);
-    bgluTessCallback(prtess, GLU_TESS_ERROR, (void (PR_CALLBACK *)(void))polymer_tesserror);
-
-    bgluTessProperty(prtess, GLU_TESS_WINDING_RULE, GLU_TESS_WINDING_POSITIVE);
-
-    bgluTessBeginPolygon(prtess, s);
-    bgluTessBeginContour(prtess);
-
-    int i = 0;
-    while (i < sec->wallnum)
-    {
-        bgluTessVertex(prtess, s->verts + (3 * i), (void *)i);
+        j++;
         if (wall[sec->wallptr+i].point2 < sec->wallptr+i)
         {
-            bgluTessEndContour(prtess);
-            bgluTessBeginContour(prtess);
+            tessAddContour(prtess, 3, s->verts + (3 * k), sizeof(float) * 3, j);
+            k += j;
+            j=0;
         }
-        i++;
     }
-    bgluTessEndContour(prtess);
-    bgluTessEndPolygon(prtess);
+    while (++i < sec->wallnum);
 
-    i = 0;
-    while (i < s->indicescount)
+    if (!tessTesselate(prtess, TESS_WINDING_POSITIVE, TESS_POLYGONS, 3, 3, nullptr))
     {
-        s->floor.indices[s->indicescount - i - 1] = s->ceil.indices[i];
+        debug_break();
+        return -1;
+    }
 
-        i++;
+    int numvertices = tessGetVertexCount(prtess);
+    int numelements = tessGetElementCount(prtess);
+    auto elements = tessGetElements(prtess);
+    auto index = tessGetVertexIndices(prtess);
+
+    if (!numelements || !numvertices)
+        return -1;
+
+    // check for tessellation results that have undefined elements or less indices than we already had
+    if (s->floor.indices)
+    {
+        if (numelements * 3 < s->indicescount)
+            return 1;
+
+        for (i = 0; i < numelements * 3; i++)
+            if (index[elements[i]] == TESS_UNDEF && numelements * 3 <= s->indicescount)
+                    return 1;
+    }
+
+    if (s->floor.indices == nullptr || s->indicescount != numelements * 3)
+    {
+        s->floor.indices = (GLushort *)Xrealloc(s->floor.indices, numelements * 3 * sizeof(GLushort));
+        s->ceil.indices  = (GLushort *)Xrealloc(s->ceil.indices, numelements * 3 * sizeof(GLushort));
+        s->indicescount  = numelements * 3;
+    }
+
+    for (j=0; j < s->indicescount; j++)
+    {
+        // FIXME: the tessellator is merging invalid features in the input,
+        // which causes problems with some of the "Star Trek" doors in Duke.
+        // the tessellator's behavior is correct, we just aren't handling it right yet
+
+        s->ceil.indices[j] = index[elements[j]];
+
+        if (index[elements[j]] == TESS_UNDEF)
+        {
+            OSD_Printf("sector %d is a very sad sector\n", sectnum);
+            s->ceil.indices[j] = 0;
+        }
+        s->floor.indices[s->indicescount-j-1] = s->ceil.indices[j];
     }
 
     s->floor.indicescount = s->ceil.indicescount = s->indicescount;
