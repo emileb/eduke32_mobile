@@ -320,13 +320,18 @@ extern uint32_t g_frameCounter;
 extern mco_coro* co_drawframe;
 extern void g_switchRoutine(mco_coro *co);
 
-static FORCE_INLINE void dukeMaybeDrawFrame(void)
+static FORCE_INLINE int dukeMaybeDrawFrame(void)
 {
     // g_frameJustDrawn is set by G_DrawFrame() (and thus by the coroutine)
     // it isn't cleared until the next game tic is processed.
 
     if (!g_frameJustDrawn && timerGetNanoTicks() >= g_lastFrameEndTime + (g_lastFrameEndTime - g_lastFrameStartTime - g_lastFrameDuration) && engineFPSLimit())
+    {
         g_switchRoutine(co_drawframe);
+        return 1;
+    }
+
+    return 0;
 }
 
 extern int32_t g_BenchmarkMode;

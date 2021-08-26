@@ -1604,15 +1604,12 @@ void                polymer_drawsprite(int32_t snum)
                 while (!prlights[i].flags.active)
                     i++;
 
-                if (prlights[i].priority != curpriority)
+                if (prlights[i].priority == curpriority
+                    && sepdist(prlights[i].x-tspr->x, prlights[i].y-tspr->y, prlights[i].z-tspr->z) < (prlights[i].range + 256))
                 {
-                    i++;
-                    j++;
-                    continue;
+                    if (polymer_planeinlight(s->plane, prlights[i]))
+                        s->plane.lights[s->plane.lightcount++] = i;
                 }
-
-                if (polymer_planeinlight(s->plane, prlights[i]))
-                    s->plane.lights[s->plane.lightcount++] = i;
 
                 i++;
                 j++;
@@ -1711,7 +1708,8 @@ int16_t             polymer_addlight(_prlight* light)
     prlights[lighti].planecount = 0;
     prlights[lighti].planelist = NULL;
 
-    polymer_culllight(lighti);
+    if (polymer_culllight(lighti))
+        prlights[lighti].flags.invalidate = 1;
 
     lightcount++;
 
@@ -2316,7 +2314,7 @@ static void         polymer_bucketplane(_prplane* plane)
     }
 }
 
-static inline _prprograminfo *polymer_getprogram(int32_t materialbits)
+static FORCE_INLINE _prprograminfo *polymer_getprogram(int32_t materialbits)
 {
     intptr_t progptr = inthash_find(&prprogramtable, materialbits);
     return (progptr != -1) ? (_prprograminfo *)progptr : polymer_compileprogram(materialbits);
@@ -3771,7 +3769,7 @@ static void         polymer_computeplane(_prplane* p)
 }
 
 
-static inline void  polymer_transformpoint(const float* inpos, float* pos, const float* matrix)
+static FORCE_INLINE void polymer_transformpoint(const float *inpos, float *pos, const float *matrix)
 {
     pos[0] = inpos[0] * matrix[0] +
              inpos[1] * matrix[4] +
@@ -3864,12 +3862,9 @@ static inline int polymer_planeinfrustum(_prplane const &plane, const float* fru
 
 static inline void  polymer_scansprites(int16_t sectnum, tspriteptr_t localtsprite, int32_t* localspritesortcnt)
 {
-    int32_t         i;
-    spritetype      *spr;
-
-    for (i = headspritesect[sectnum];i >=0;i = nextspritesect[i])
+    for (int i = headspritesect[sectnum];i >=0;i = nextspritesect[i])
     {
-        spr = &sprite[i];
+        auto spr = (uspriteptr_t)&sprite[i];
         if ((((spr->cstat&0x8000) == 0) || (showinvisibility)) &&
                 (spr->xrepeat > 0) && (spr->yrepeat > 0) &&
                 (*localspritesortcnt < maxspritesonscreen))
@@ -5839,10 +5834,9 @@ static void         polymer_updatelights(void)
 
             if (light->radius)
                 polymer_processspotlight(light);
-
-            polymer_culllight(i);
-
-            light->flags.invalidate = 0;
+            
+            if (!polymer_culllight(i))
+                light->flags.invalidate = 0;
         }
 
         if (light->flags.active) {
@@ -5870,7 +5864,7 @@ static void         polymer_updatelights(void)
     while (++i < PR_MAXLIGHTS);
 }
 
-static inline void  polymer_resetplanelights(_prplane* plane)
+static FORCE_INLINE void  polymer_resetplanelights(_prplane* plane)
 {
     Bmemset(&plane->lights[0], -1, sizeof(plane->lights[0]) * plane->lightcount);
     plane->lightcount = 0;
@@ -5927,11 +5921,10 @@ out:
     prlights[lighti].planecount++;
 }
 
-static inline void polymer_deleteplanelight(_prplane *const plane, int16_t const lighti)
+static FORCE_INLINE void polymer_deleteplanelight(_prplane *const plane, int16_t const lighti)
 {
     int i = plane->lightcount - 1;
-
-    while (i >= 0)
+    do
     {
         if (plane->lights[i] == lighti)
         {
@@ -5939,8 +5932,8 @@ static inline void polymer_deleteplanelight(_prplane *const plane, int16_t const
             plane->lightcount--;
             return;
         }
-        i--;
     }
+    while (--i >= 0);
 }
 
 static int polymer_planeinlight(_prplane const &plane, _prlight const &light)
@@ -5975,7 +5968,7 @@ static int polymer_planeinlight(_prplane const &plane, _prlight const &light)
     return 1;
 }
 
-static void polymer_invalidateplanelights(_prplane const &plane)
+static FORCE_INLINE void polymer_invalidateplanelights(_prplane const &plane)
 {
     int i = plane.lightcount;
 
@@ -6051,12 +6044,15 @@ static void polymer_processspotlight(_prlight *const light)
     light->lightmap = 0;
 }
 
-static inline void  polymer_culllight(int16_t lighti)
+static int polymer_culllight(int16_t lighti)
 {
-    _prlight const &   light = prlights[lighti];
-    int32_t         front = 0;
-    int32_t         back = 1;
-    int16_t         bunchnum;
+    _prlight const &light = prlights[lighti];
+
+    int32_t front = 0;
+    int32_t back  = 1;
+    int16_t bunchnum;
+
+    if (!sectorsareconnected(globalcursectnum, light.sector)) return 1;
 
     Bmemset(drawingstate, 0, sizeof(drawingstate));
     bitmap_set(drawingstate, light.sector);
@@ -6150,6 +6146,9 @@ static inline void  polymer_culllight(int16_t lighti)
 
             int j = 0;
 
+            if (!wallvisible(light.x, light.y, sec->wallptr + i) && (wal->nextwall == -1 || !wallvisible(light.x, light.y, wal->nextwall)))
+                continue;
+
             if (!(sec->floorstat & 1 && nsec && nsec->floorstat & 1))
             {
                 if (polymer_planeinlight(w->wall, light)) {
@@ -6167,43 +6166,44 @@ static inline void  polymer_culllight(int16_t lighti)
             }
 
             // assume the light hits the middle section if it hits the top and bottom
-            if (wallvisible(light.x, light.y, sec->wallptr + i) &&
-                (j == 2 || polymer_planeinlight(w->mask, light))) {
+            if (wallvisible(light.x, light.y, sec->wallptr + i) && (j == 2 || polymer_planeinlight(w->mask, light)))
+            {
                 if ((w->mask.vertcount == 4) &&
                     (w->mask.buffer[0].y >= w->mask.buffer[3].y) &&
                     (w->mask.buffer[1].y >= w->mask.buffer[2].y))
-                {
-                    i++;
                     continue;
-                }
 
                 polymer_addplanelight(&w->mask, lighti);
 
-                if ((wall[sec->wallptr + i].nextsector >= 0) && !bitmap_test(drawingstate, wall[sec->wallptr + i].nextsector))
+                int ns = wall[sec->wallptr + i].nextsector;
+
+                if (((unsigned)ns < MAXSECTORS) && !bitmap_test(drawingstate, ns))
                 {
-                    bitmap_set(drawingstate, wall[sec->wallptr + i].nextsector);
-                    sectorqueue[back] = wall[sec->wallptr + i].nextsector;
-                    back++;
+                    bitmap_set(drawingstate, ns);
+
+                    if (getsectordist(light.xy, ns) < light.range)
+                        sectorqueue[back++] = ns;
                 }
             }
         }
         while (++i < sec->wallnum);
+
+        for (int16_t SPRITES_OF_SECT(sectorqueue[front], i))
+        {
+            _prsprite *s = prsprites[i];
+
+            if ((sprite[i].cstat & 48) == 0 || s == NULL)
+                continue;
+        
+            if (polymer_planeinlight(s->plane, light))
+                polymer_addplanelight(&s->plane, lighti);
+        }
+
         front++;
     }
     while (front != back);
 
-    int i = MAXSPRITES-1;
-    do
-    {
-        _prsprite *s = prsprites[i];
-
-        if ((sprite[i].cstat & 48) == 0 || s == NULL || sprite[i].statnum == MAXSTATUS || sprite[i].sectnum == MAXSECTORS)
-            continue;
-
-        if (polymer_planeinlight(s->plane, light))
-            polymer_addplanelight(&s->plane, lighti);
-    }
-    while (i--);
+    return 0;
 }
 
 static void         polymer_prepareshadows(void)

@@ -440,10 +440,10 @@ static inline void  polymer_resetplanelights(_prplane* plane);
 static void         polymer_addplanelight(_prplane* plane, int16_t lighti);
 static inline void  polymer_deleteplanelight(_prplane* plane, int16_t lighti);
 static int32_t      polymer_planeinlight(_prplane const &plane, _prlight const &light);
-static void         polymer_invalidateplanelights(_prplane const &plane);
+static inline void  polymer_invalidateplanelights(_prplane const &plane);
 static void         polymer_invalidatesectorlights(int16_t sectnum);
 static void         polymer_processspotlight(_prlight* light);
-static inline void  polymer_culllight(int16_t lighti);
+static int          polymer_culllight(int16_t lighti);
 static void         polymer_prepareshadows(void);
 // RENDER TARGETS
 static void         polymer_initrendertargets(int32_t count);

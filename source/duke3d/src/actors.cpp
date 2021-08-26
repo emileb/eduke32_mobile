@@ -8587,11 +8587,18 @@ next_sprite:
 
 static void G_DoEffectorLights(void)  // STATNUM 14
 {
-    int32_t i;
+    static int16_t lasti = -1;
+    int16_t i;
+
+    if (lasti != -1 && sprite[lasti].statnum == STAT_LIGHT)
+    {
+        i = lasti;
+        goto in;
+    }
 
     for (SPRITES_OF(STAT_LIGHT, i))
     {
-        dukeMaybeDrawFrame();
+in:
         int16_t flicker = -1;
 
         for (int SPRITES_OF_SECT(sprite[i].sectnum, j))
@@ -8602,6 +8609,12 @@ static void G_DoEffectorLights(void)  // STATNUM 14
         {
             A_DeleteLight(i);
             continue;
+        }
+
+        if ((int32_t)(totalclock - ototalclock) >= TICSPERFRAME || dukeMaybeDrawFrame())
+        {
+            lasti = i;
+            return;
         }
 
         switch (sprite[i].lotag)
@@ -8779,6 +8792,8 @@ static void G_DoEffectorLights(void)  // STATNUM 14
 #endif // POLYMER
         }
     }
+
+    lasti = -1;
 }
 
 #ifdef POLYMER
