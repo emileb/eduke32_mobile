@@ -835,6 +835,7 @@ int32_t             polymer_init(void)
                             GL_BGRA,                      // upload format
                             GL_UNSIGNED_BYTE,             // upload component type
                             prhighpalookups[i][j].data);     // data pointer
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -4914,6 +4915,8 @@ static void         polymer_setupartmap(int16_t tilenum, char pal, int32_t meth)
             GL_RED,
             GL_UNSIGNED_BYTE,
             tempbuffer);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, meth & DAMETH_CLAMPED ? GL_CLAMP_TO_EDGE : GL_REPEAT);
@@ -4934,6 +4937,7 @@ static void         polymer_setupartmap(int16_t tilenum, char pal, int32_t meth)
             GL_RGB,
             GL_UNSIGNED_BYTE,
             basepaltable[curbasepal]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -4953,6 +4957,7 @@ static void         polymer_setupartmap(int16_t tilenum, char pal, int32_t meth)
             GL_RED,
             GL_UNSIGNED_BYTE,
             palookup[pal]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -6326,6 +6331,7 @@ static void         polymer_initrendertargets(int32_t count)
             buildgl_bindTexture(prrts[i].target, prrts[i].color);
 
             glTexImage2D(prrts[i].target, 0, GL_RGB, prrts[i].xdim, prrts[i].ydim, 0, GL_RGB, GL_SHORT, NULL);
+            glTexParameteri(prrts[i].target, GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(prrts[i].target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(prrts[i].target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(prrts[i].target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -6341,6 +6347,7 @@ static void         polymer_initrendertargets(int32_t count)
                 buildgl_bindTexture(prrts[i].target, prrts[i].color);
 
                 glTexImage2D(prrts[i].target, 0, GL_RGB, prrts[i].xdim, prrts[i].ydim, 0, GL_RGB, GL_SHORT, NULL);
+                glTexParameteri(prrts[i].target, GL_TEXTURE_BASE_LEVEL, 0);
                 glTexParameteri(prrts[i].target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 glTexParameteri(prrts[i].target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri(prrts[i].target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -6352,6 +6359,7 @@ static void         polymer_initrendertargets(int32_t count)
         buildgl_bindTexture(prrts[i].target, prrts[i].z);
 
         glTexImage2D(prrts[i].target, 0, GL_DEPTH_COMPONENT, prrts[i].xdim, prrts[i].ydim, 0, GL_DEPTH_COMPONENT, GL_SHORT, NULL);
+        glTexParameteri(prrts[i].target, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(prrts[i].target, GL_TEXTURE_MIN_FILTER, pr_shadowfiltering ? GL_LINEAR : GL_NEAREST);
         glTexParameteri(prrts[i].target, GL_TEXTURE_MAG_FILTER, pr_shadowfiltering ? GL_LINEAR : GL_NEAREST);
         glTexParameteri(prrts[i].target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
