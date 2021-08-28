@@ -1006,7 +1006,7 @@ EXTERN char show2dsprite[(MAXSPRITES+7)>>3];
 #endif
 
 EXTERN char GOTPIC_USED gotpic[(MAXTILES+7)>>3];
-EXTERN char gotsector[(MAXSECTORS+7)>>3];
+EXTERN uint8_t gotsector[(MAXSECTORS+7)>>3];
 
 EXTERN char editorcolors[256];
 EXTERN char editorcolorsdef[256];

@@ -215,6 +215,8 @@ void calc_and_apply_fog_factor(int32_t shade, int32_t vis, int32_t pal, float fa
 
 
 // int32_t wallmost(int16_t *mostbuf, int32_t w, int32_t sectnum, char dastat);
+void classicScanSector(int16_t startsectnum);
+int32_t bunchfront(int32_t b1, int32_t b2);
 int32_t wallfront(int32_t l1, int32_t l2);
 
 void set_globalang(fix16_t const ang);
@@ -244,7 +246,9 @@ void dorotspr_handle_bit2(int32_t *sx, int32_t *sy, int32_t *z, int32_t dastat,
 
 ////// yax'y stuff //////
 #ifdef USE_OPENGL
+extern int polymost_variable_soup(void);
 extern void polymost_scansector(int32_t sectnum);
+extern int32_t polymost_bunchfront(const int32_t b1, const int32_t b2);
 #endif
 int32_t renderAddTsprite(int16_t z, int16_t sectnum);
 #ifdef YAX_ENABLE

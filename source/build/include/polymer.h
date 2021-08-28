@@ -21,6 +21,7 @@ extern "C" {
 #define PR_LINEAR_FOG
 
 // CVARS
+extern int32_t      pr_scansectors;
 extern int32_t      pr_lighting;
 extern int32_t      pr_normalmapping;
 extern int32_t      pr_specularmapping;
@@ -256,6 +257,10 @@ typedef struct      s_prplane {
 typedef struct      s_prsector {
     // polymer data
     GLfloat*       verts;
+    // occlusion queries for walls
+    GLuint*         queries;
+    uint8_t*        qstate;
+
     _prplane        floor;
     _prplane        ceil;
     int32_t         indicescount;
@@ -392,7 +397,7 @@ static FORCE_INLINE int32_t polymer_eligible_for_artmap(int32_t tilenum, const p
 # ifdef POLYMER_C
 
 // CORE
-static void         polymer_displayrooms(int16_t sectnum);
+static void         polymer_displayrooms(int16_t sectnum, int skipqueries = 0);
 static void         polymer_emptybuckets(void);
 static _prbucket*   polymer_findbucket(int16_t tilenum, char pal);
 static void         polymer_bucketplane(_prplane* plane);

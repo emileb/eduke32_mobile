@@ -25,7 +25,7 @@ int32_t pr_ati_nodepthoffset  = 0;
 int32_t pr_billboardingmode   = 1;
 int32_t pr_buckets            = 0;
 double  pr_customaspect       = 0.0f;
-int32_t pr_fov                = 512;
+int32_t pr_fov                = 427;
 int32_t pr_gpusmoothing       = 1;
 int32_t pr_highpalookups      = 1;
 int32_t pr_hudangadd          = 0;
@@ -717,8 +717,10 @@ GLfloat         rootskymodelviewmatrix[16];
 GLfloat         *curskymodelviewmatrix;
 
 static int16_t  sectorqueue[MAXSECTORS];
-static GLuint   queryid[MAXWALLS];
 static uint8_t  drawingstate[(MAXSECTORS+7)>>3];
+
+#define MAXQUERIES 256
+int16_t numqueries;
 
 int16_t         *cursectormasks;
 int16_t         *cursectormaskcount;
@@ -1262,6 +1264,7 @@ void polymer_drawrooms(int32_t daposx, int32_t daposy, int32_t daposz, fix16_t d
         return;
     }
 
+
     // GO!
     polymer_displayrooms(dacursectnum);
 
@@ -1272,10 +1275,10 @@ void polymer_drawrooms(int32_t daposx, int32_t daposy, int32_t daposz, fix16_t d
     set_globalang(daang);
 
     // polymost globals used by polymost_dorotatesprite
-    gcosang = fcosglobalang*(1./262144.f);
-    gsinang = fsinglobalang*(1./262144.f);
-    gcosang2 = gcosang*fviewingrange*(1./65536.f);
-    gsinang2 = gsinang*fviewingrange*(1./65536.f);
+    //gcosang = fcosglobalang*(1./262144.f);
+    //gsinang = fsinglobalang*(1./262144.f);
+    //gcosang2 = gcosang*fviewingrange*(1./65536.f);
+    //gsinang2 = gsinang*fviewingrange*(1./65536.f);
 
     if (pr_verbosity >= 3) OSD_Printf("PR : Rooms drawn.\n");
     videoEndDrawing();
@@ -1788,16 +1791,62 @@ bool polymer_havehighpalookup(uint8_t basepalnum, uint8_t palnum)
     return prhighpalookups[basepalnum] != nullptr && prhighpalookups[basepalnum][palnum].data != nullptr;
 }
 
+static FORCE_INLINE bool polymer_wallinfrustum(int16_t wallnum, float const * frustum)
+{
+    _prwall const &w = *prwalls[wallnum];
+    return polymer_planeinfrustum(w.mask, frustum) || ((w.underover & 1) && polymer_planeinfrustum(w.wall, frustum))
+           || ((w.underover & 2) && polymer_planeinfrustum(w.over, frustum));
+}
+
+#define Q_WAITING  0x1
+#define Q_VISIBLE  0x2
+#define Q_OCCLUDED 0x4
+#define Q_VISMASK  (Q_VISIBLE | Q_OCCLUDED)
+#define Q_DRAWN    0x8
+
+static void polymer_updatequerystate(void)
+{
+    int j=0;
+    do
+    {
+        auto sec = (usectorptr_t) &sector[j];
+        auto wal = (uwallptr_t) &wall[sec->wallptr];
+        auto qstate = prsectors[j]->qstate;
+        auto query  = prsectors[j]->queries;
+
+        int i=0;
+        do
+        {
+            qstate[i] &= ~Q_DRAWN;
+
+            if (query[i])
+            {
+                // REAP
+                GLint available = 0;
+                glGetQueryObjectiv(query[i], GL_QUERY_RESULT_AVAILABLE, &available);
+                if (available)
+                {
+                    GLint result = 0;
+                    glGetQueryObjectiv(query[i], GL_QUERY_RESULT, &result);
+                    glDeleteQueries(1, &query[i]);
+                    numqueries--;
+                    query[i] = 0;
+
+                    if ((qstate[i] & Q_WAITING) || result)
+                        qstate[i] = (qstate[i] & ~(Q_WAITING|Q_VISMASK))|(Q_OCCLUDED >> result);
+                }
+            }
+            wal++;
+        } while (++i < sec->wallnum);
+    } while (++j < numsectors);
+}
 
 // CORE
-static void         polymer_displayrooms(const int16_t dacursectnum)
+static void         polymer_displayrooms(const int16_t dacursectnum, int lightidx /*= 0*/)
 {
-    usectorptr_t      sec;
     int32_t         i;
     int16_t         bunchnum;
     int16_t         ns;
-    GLint           result;
-    int16_t         doquery;
     int32_t         front;
     int32_t         back;
     GLfloat         localskymodelviewmatrix[16];
@@ -1815,13 +1864,34 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
     int32_t         gx, gy, gz, px, py, pz;
     float           coeff;
 
+    auto addMirrorToList = [&](int const wallnum, int const sectnum)
+    {
+        _prwall *w = prwalls[wallnum];
+
+        mirrorlist[mirrorcount].plane   = &w->mask;
+        mirrorlist[mirrorcount].sectnum = sectnum;
+        mirrorlist[mirrorcount].wallnum = wallnum;
+        mirrorcount++;
+    };
+
+    auto maybeAddMaskedWall = [&](int const wallnum)
+    {
+        auto wal = (uwallptr_t)&wall[wallnum];
+
+        if ((wal->cstat & (/*CSTAT_WALL_1WAY | */CSTAT_WALL_MASKED)) == CSTAT_WALL_MASKED)
+        {
+            int pic = wal->overpicnum;
+            if (tilesiz[pic].x > 0 && tilesiz[pic].y > 0)
+                localmaskwall[localmaskwallcnt++] = wallnum;
+        }
+    };
+
     curmodelviewmatrix = localmodelviewmatrix;
     glGetFloatv(GL_MODELVIEW_MATRIX, localmodelviewmatrix);
     glGetFloatv(GL_PROJECTION_MATRIX, localprojectionmatrix);
 
     polymer_extractfrustum(localmodelviewmatrix, localprojectionmatrix, frustum);
 
-    Bmemset(queryid, 0, sizeof(GLuint) * numwalls);
     Bmemset(drawingstate, 0, sizeof(drawingstate));
 
     front = 0;
@@ -1847,18 +1917,96 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
 //     overridematerial = 0;
 
     prcanbucket = 1;
+    
+    polymer_updatequerystate();
+
+    maskwallcnt = 0;
+    numscans = numbunches = 0;
+    int32_t const oyxaspect = yxaspect, oviewingrange = viewingrange;
+    if (lightidx) renderSetAspect(65536, prlights[lightidx].range<<1);
+    polymost_variable_soup();
+    scansector_collectsprites = 0;
+    polymost_scansector(dacursectnum);
+
+    while (numbunches > 0)
+    {
+        Bmemset(ptempbuf,0,numbunches+3); ptempbuf[0] = 1;
+
+        int32_t closest = 0;              //Almost works, but not quite :(
+        for (int i=1,j; i<numbunches; i++)
+        {
+            if ((j = polymost_bunchfront(i,closest)) < 0) continue;
+            ptempbuf[i] = 1;
+            if (j == 0) ptempbuf[closest] = 1, closest = i;
+        }
+        for (int i=0,j; i<numbunches; i++) //Double-check
+        {
+            if (ptempbuf[i]) continue;
+            if ((j = polymost_bunchfront(i,closest)) < 0) continue;
+            ptempbuf[i] = 1;
+            if (j == 0) ptempbuf[closest] = 1, closest = i, i = 0;
+        }
+
+        for (int z = bunchfirst[closest]; z >= 0; z = bunchp2[z])
+        {
+            int const sectnum = thesector[z];
+            int const wallnum = thewall[z];
+
+            auto qstate = prsectors[sectnum]->qstate;
+            int  widx   = wallnum - sector[sectnum].wallptr;
+
+            auto sec = (usectorptr_t)&sector[sectnum];
+            auto wal = (uwallptr_t)&wall[wallnum];
+
+            if (((lightidx || depth) || (qstate[widx] & (Q_OCCLUDED|Q_DRAWN)) == 0) && wallvisible(globalposx, globalposy, wallnum))
+            {
+                if (polymer_planeinfrustum(prwalls[wallnum]->mask, frustum)) 
+                {
+                    int const ns = wall[wallnum].nextsector;
+                    if ((wall[wallnum].cstat & 32) == 0 && ns != -1 && !bitmap_test(drawingstate, ns))
+                    {
+                        sectorqueue[back++] = ns;
+                        bitmap_set(drawingstate, ns);
+                        polymost_scansector(ns);
+                    }
+                }
+
+                if (((prwalls[wallnum]->underover & 1) && polymer_planeinfrustum(prwalls[wallnum]->wall, frustum))
+                    || ((prwalls[wallnum]->underover & 2) && polymer_planeinfrustum(prwalls[wallnum]->over, frustum)))
+                {
+                    qstate[widx] |= Q_VISIBLE|Q_DRAWN;
+
+                    maybeAddMaskedWall(wallnum);
+
+                    if (!depth && (qstate[widx] & Q_VISIBLE) && (overridematerial & prprogrambits[PR_BIT_MIRROR_MAP].bit)
+                        && pr_wireframe == 0 && wal->overpicnum == 560 && (wal->cstat & CSTAT_WALL_1WAY))
+                        addMirrorToList(wallnum, sectnum);
+
+                    //auto oldoverridematerial = overridematerial;
+                    //overridematerial = 0;
+                    polymer_drawwall(sectnum, wallnum);
+                    //overridematerial = oldoverridematerial;
+                }
+            }
+        }
+
+        numbunches--;
+        bunchfirst[closest] = bunchfirst[numbunches];
+        bunchlast[closest]  = bunchlast[numbunches];
+    }
+    scansector_collectsprites = 1;
 
     while (front != back)
     {
-        sec = (usectorptr_t)&sector[sectorqueue[front]];
+        auto sec = (usectorptr_t)&sector[sectorqueue[front]];
 
         polymer_pokesector(sectorqueue[front]);
         polymer_drawsector(sectorqueue[front], FALSE);
         polymer_scansprites(sectorqueue[front], localtsprite, &localspritesortcnt);
 
-        doquery = 0;
+        int doquery = 0;
 
-        i = sec->wallnum-1;
+        i = 0;
         do
         {
             // if we have a level boundary somewhere in the sector,
@@ -1866,117 +2014,127 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
             if (wall[sec->wallptr + i].nextsector < 0 && pr_buckets == 0)
                 doquery = 1;
         }
-        while (--i >= 0);
+        while (++i < sec->wallnum);
 
-        i = sec->wallnum-1;
-        while (i >= 0)
+        auto prsect = prsectors[sectorqueue[front]];
+
+        auto query = prsect->queries;
+        auto qstate = prsect->qstate;
+
+        i = 0;
+        auto wal = (uwallptr_t)&wall[sec->wallptr + i];
+
+        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+        glDepthMask(GL_FALSE);
+
+        do
         {
-            if ((wall[sec->wallptr + i].nextsector >= 0) &&
-                (wallvisible(globalposx, globalposy, sec->wallptr + i)) &&
-                (polymer_planeinfrustum(prwalls[sec->wallptr + i]->mask, frustum)))
+            _prwall *w = prwalls[sec->wallptr + i];
+
+            if ((qstate[i] & Q_DRAWN) || !w || !polymer_wallinfrustum(sec->wallptr + i, frustum))
             {
-                if ((prwalls[sec->wallptr + i]->mask.vertcount == 4) &&
-                    !(prwalls[sec->wallptr + i]->underover & 4) &&
-                    !(prwalls[sec->wallptr + i]->underover & 8))
+                wal++;
+                continue;
+            }
+
+            if ((w->mask.vertcount == 4) && (w->underover & (4|8)) == 0)
+            {
+                // early exit for closed sectors                    
+                if ((w->mask.buffer[0].y >= w->mask.buffer[3].y) &&
+                    (w->mask.buffer[1].y >= w->mask.buffer[2].y))
                 {
-                    // early exit for closed sectors
-                    _prwall         *w;
-
-                    w = prwalls[sec->wallptr + i];
-
-                    if ((w->mask.buffer[0].y >= w->mask.buffer[3].y) &&
-                        (w->mask.buffer[1].y >= w->mask.buffer[2].y))
-                    {
-                        i--;
-                        continue;
-                    }
-                }
-
-                if ((wall[sec->wallptr + i].cstat & 48) == 16)
-                {
-                    int pic = wall[sec->wallptr + i].overpicnum;
-
-                    if (tilesiz[pic].x > 0 && tilesiz[pic].y > 0)
-                        localmaskwall[localmaskwallcnt++] = sec->wallptr + i;
-                }
-
-                if (!depth && (overridematerial & prprogrambits[PR_BIT_MIRROR_MAP].bit) &&
-                     wall[sec->wallptr + i].overpicnum == 560 &&
-                     wall[sec->wallptr + i].cstat & 32)
-                {
-                    mirrorlist[mirrorcount].plane = &prwalls[sec->wallptr + i]->mask;
-                    mirrorlist[mirrorcount].sectnum = sectorqueue[front];
-                    mirrorlist[mirrorcount].wallnum = sec->wallptr + i;
-                    mirrorcount++;
-                }
-
-                if (!(wall[sec->wallptr + i].cstat & 32)) {
-                    if (doquery && !bitmap_test(drawingstate, wall[sec->wallptr + i].nextsector))
-                    {
-                        float pos[3], sqdist;
-                        int32_t oldoverridematerial;
-
-                        pos[0] = fglobalposy;
-                        pos[1] = fglobalposz * (-1.f/16.f);
-                        pos[2] = -fglobalposx;
-
-                        sqdist = prwalls[sec->wallptr + i]->mask.plane[0] * pos[0] +
-                                 prwalls[sec->wallptr + i]->mask.plane[1] * pos[1] +
-                                 prwalls[sec->wallptr + i]->mask.plane[2] * pos[2] +
-                                 prwalls[sec->wallptr + i]->mask.plane[3];
-
-                        // hack to avoid occlusion querying portals that are too close to the viewpoint
-                        // this is needed because of the near z-clipping plane;
-                        if (sqdist < 100)
-                            queryid[sec->wallptr + i] = 0xFFFFFFFF;
-                        else {
-                            _prwall         *w;
-
-                            w = prwalls[sec->wallptr + i];
-
-                            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-                            glDepthMask(GL_FALSE);
-
-                            //buildgl_bindSamplerObject(0, PTH_DEPTH_SAMPLER);
-
-                            glGenQueries(1, &queryid[sec->wallptr + i]);
-                            glBeginQuery(GL_SAMPLES_PASSED, queryid[sec->wallptr + i]);
-
-                            oldoverridematerial = overridematerial;
-                            overridematerial = 0;
-
-                            if ((w->underover & 4) && (w->underover & 1))
-                                polymer_drawplane(&w->wall);
-                            polymer_drawplane(&w->mask);
-                            if ((w->underover & 8) && (w->underover & 2))
-                                polymer_drawplane(&w->over);
-
-                            overridematerial = oldoverridematerial;
-
-                            glEndQuery(GL_SAMPLES_PASSED);
-
-                            glDepthMask(GL_TRUE);
-                            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-                        }
-                    } else
-                        queryid[sec->wallptr + i] = 0xFFFFFFFF;
+                    wal++;
+                    continue;
                 }
             }
 
-            i--;
-        }
+            maybeAddMaskedWall(sec->wallptr + i);
 
-        // Cram as much CPU or GPU work as we can between queuing the
-        // occlusion queries and reaping them.
-        i = sec->wallnum-1;
+            if (!depth && (qstate[i] & Q_VISIBLE) && (overridematerial & prprogrambits[PR_BIT_MIRROR_MAP].bit)
+                && pr_wireframe == 0 && wal->overpicnum == 560 && (wal->cstat & CSTAT_WALL_1WAY))
+                addMirrorToList(sec->wallptr + i, sectorqueue[front]);
+
+            if (!doquery)
+            {
+                wal++;
+                continue;
+            }
+
+            float pos[3], sqdist;
+            int32_t oldoverridematerial;
+
+            pos[0] = fglobalposy;
+            pos[1] = fglobalposz * (-1.f/16.f);
+            pos[2] = -fglobalposx;
+
+            sqdist = w->mask.plane[0] * pos[0] +
+                        w->mask.plane[1] * pos[1] +
+                        w->mask.plane[2] * pos[2] +
+                        w->mask.plane[3];
+
+            // hack to avoid occlusion querying portals that are too close to the viewpoint
+            // this is needed because of the near z-clipping plane;
+            if (sqdist < 100)
+            {
+                if (!lightidx && !depth)
+                    qstate[i] = (qstate[i] & ~Q_OCCLUDED)|Q_VISIBLE;
+
+                if (wal->nextsector != -1 && !bitmap_test(drawingstate, wal->nextsector))
+                {
+                    sectorqueue[back++] = wal->nextsector;
+                    bitmap_set(drawingstate, wal->nextsector);
+                }
+            }
+            else if (((lightidx || depth) || ((qstate[i] & Q_WAITING) == 0 && numqueries < MAXQUERIES)) && wallvisible(globalposx, globalposy, sec->wallptr + i))
+            {
+                if (!lightidx && !depth)
+                {
+                    Bassert(!query[i]);
+                    //if (!query[0])
+                    if (++numqueries >= MAXQUERIES)
+                        OSD_Puts("!!numqueries\n");
+                    else
+                    {
+                        qstate[i] |= Q_WAITING;
+                        glGenQueries(1, &query[i]);
+                        glBeginQuery(GL_ANY_SAMPLES_PASSED, query[i]);
+                    }
+                }
+
+                oldoverridematerial = overridematerial;
+                overridematerial = 0;
+
+                if ((w->underover & 1) && polymer_planeinfrustum(w->wall, frustum))
+                    polymer_drawplane(&w->wall);
+                if (polymer_planeinfrustum(w->mask, frustum))
+                    polymer_drawplane(&w->mask);
+                if ((w->underover & 2) && polymer_planeinfrustum(w->over, frustum))
+                    polymer_drawplane(&w->over);
+
+                overridematerial = oldoverridematerial;
+
+                if (!lightidx && !depth)
+                    glEndQuery(GL_ANY_SAMPLES_PASSED);
+            }
+
+            wal++;
+        }
+        while (++i < sec->wallnum);
+
+        glDepthMask(GL_TRUE);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        i = 0;
         do
         {
-            if (wallvisible(globalposx, globalposy, sec->wallptr + i))
+            if ((lightidx || (qstate[i] & (Q_OCCLUDED|Q_DRAWN)) == 0) && wallvisible(globalposx, globalposy, sec->wallptr + i))
+            {
+                qstate[i] |= Q_DRAWN;
                 polymer_drawwall(sectorqueue[front], sec->wallptr + i);
+            }
         }
-        while (--i >= 0);
+        while (++i < sec->wallnum);
 #ifdef YAX_ENABLE
-        // queue ROR neighbors
+        // XXXXXXXXXXXXXX queue ROR neighbors
         if ((bunchnum = yax_getbunch(sectorqueue[front], YAX_FLOOR)) >= 0) {
 
             for (SECTORS_OF_BUNCH(bunchnum, YAX_CEILING, ns)) {
@@ -2003,38 +2161,6 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
             }
         }
 #endif
-        i = sec->wallnum-1;
-        do
-        {
-            if ((queryid[sec->wallptr + i]) && !bitmap_test(drawingstate, wall[sec->wallptr + i].nextsector))
-            {
-                // REAP
-                result = 0;
-                if (doquery && (queryid[sec->wallptr + i] != 0xFFFFFFFF))
-                {
-                    glGetQueryObjectiv(queryid[sec->wallptr + i],
-                                           GL_QUERY_RESULT,
-                                           &result);
-                    glDeleteQueries(1, &queryid[sec->wallptr + i]);
-                } else if (queryid[sec->wallptr + i] == 0xFFFFFFFF)
-                    result = 1;
-
-                queryid[sec->wallptr + i] = 0;
-
-                if (result || !doquery)
-                {
-                    sectorqueue[back++] = wall[sec->wallptr + i].nextsector;
-                    bitmap_set(drawingstate, wall[sec->wallptr + i].nextsector);
-                }
-            } else if (queryid[sec->wallptr + i] &&
-                       queryid[sec->wallptr + i] != 0xFFFFFFFF)
-            {
-                glDeleteQueries(1, &queryid[sec->wallptr + i]);
-                queryid[sec->wallptr + i] = 0;
-            }
-        }
-        while (--i >= 0);
-
         front++;
     }
 
@@ -2050,7 +2176,7 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
         front = 0;
         while (front < back)
         {
-            sec = (usectorptr_t)&sector[sectorqueue[front]];
+            auto sec = (usectorptr_t)&sector[sectorqueue[front]];
 
             polymer_drawsector(sectorqueue[front], 0);
 
@@ -2121,7 +2247,7 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
 
         // map back from polymer to build
         set_globalpos(-pz, px, -py * 16);
-
+        set_globalang((viewangle) & 0x7FFFFFF);
         mirrors[depth++] = mirrorlist[i];
         polymer_displayrooms(mirrorlist[i].sectnum);
         depth--;
@@ -2165,6 +2291,8 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
         renderDrawMasks();
         buildgl_setEnabled(GL_CULL_FACE);
     }
+
+    if (lightidx) renderSetAspect(oviewingrange, oyxaspect);
 }
 
 static void         polymer_emptybuckets(void)
@@ -2499,7 +2627,19 @@ static void         polymer_freeboard(void)
             if (prsectors[i]->ceil.ivbo) glDeleteBuffers(1, &prsectors[i]->ceil.ivbo);
             if (prsectors[i]->floor.vbo) glDeleteBuffers(1, &prsectors[i]->floor.vbo);
             if (prsectors[i]->floor.ivbo) glDeleteBuffers(1, &prsectors[i]->floor.ivbo);
+            auto &sect = prsectors[i];
+            if (sect->queries)
+            {
+                for (int j=0;j<sector[i].wallnum;j++)
+                    if (glIsQuery(sect->queries[j]))
+                    {
+                        numqueries--;
+                        glDeleteQueries(1, &sect->queries[j]);
+                    }
 
+                Xaligned_free(sect->queries);
+                Xfree(sect->qstate);
+            }
             DO_FREE_AND_NULL(prsectors[i]);
         }
 
@@ -2594,6 +2734,9 @@ static int32_t      polymer_initsector(int16_t sectnum)
     glGenBuffers(1, &s->floor.ivbo);
     glGenBuffers(1, &s->ceil.ivbo);
 
+    s->queries = (GLuint *)Xaligned_calloc(64, sec->wallnum, sizeof(GLuint));
+    s->qstate = (uint8_t *)Xcalloc(1, sec->wallnum);
+
     buildgl_bindBuffer(GL_ARRAY_BUFFER, s->floor.vbo);
     glBufferData(GL_ARRAY_BUFFER, sec->wallnum * sizeof(GLfloat) * 5, NULL, mapvbousage);
 
@@ -2638,23 +2781,22 @@ static int32_t      polymer_updatesector(int16_t sectnum)
 
     do
     {
-        if ((-wal->x != Blrintf(s->verts[(i*3)+2])))
+        if ((-wal->x != s->verts[(i*3)+2]))
         {
             s->verts[(i*3)+2] = s->floor.buffer[i].z = s->ceil.buffer[i].z = -(float)wal->x;
             needfloor = wallinvalidate = 1;
         }
 
-        if ((wal->y != Blrintf(s->verts[i*3])))
+        if ((wal->y != s->verts[i*3]))
         {
             s->verts[i*3] = s->floor.buffer[i].x = s->ceil.buffer[i].x = (float)wal->y;
             needfloor = wallinvalidate = 1;
         }
 
-        i++;
         wal++;
     }
-    while (i < sec->wallnum);
-
+    while (++i < sec->wallnum);
+    
     if (needfloor || 
             (s->flags.empty) ||
             (sec->floorz != s->floorz) ||
@@ -2664,20 +2806,17 @@ static int32_t      polymer_updatesector(int16_t sectnum)
     {
         wallinvalidate = 1;
 
+        int32_t ceilz, florz;
         wal = (uwallptr_t)&wall[sec->wallptr];
         i = 0;
-
-        int32_t ceilz, florz;
-
-        while (i < sec->wallnum)
+        do
         {
             getzsofslope(sectnum, wal->x, wal->y, &ceilz, &florz);
             s->floor.buffer[i].y = -(float)(florz) * (1.f/16.f);
             s->ceil.buffer[i].y = -(float)(ceilz) * (1.f/16.f);
-
-            i++;
             wal++;
         }
+        while (++i < sec->wallnum);
 
         s->floorz = sec->floorz;
         s->ceilingz = sec->ceilingz;
@@ -4230,8 +4369,8 @@ static void         polymer_initartsky(void)
 
     for (int i = 0; i < PSKYOFF_MAX; i++)
     {
-        artskydata[i * 2 + 0] = -cos(i * factor);
-        artskydata[i * 2 + 1] = sin(i * factor);
+        artskydata[i * 2 + 0] = -cosf(i * factor);
+        artskydata[i * 2 + 1] = sinf(i * factor);
     }
 }
 
@@ -4464,10 +4603,10 @@ static void         polymer_drawmdsprite(tspriteptr_t tspr)
     if (tspriteptr[maxspritesonscreen] == tspr) {
         float playerang, radplayerang, cosminusradplayerang, sinminusradplayerang, hudzoom;
 
-        playerang = (globalang & 2047) * (360.f/2048.f) - 90.0f;
-        radplayerang = (globalang & 2047) * (2.0f * fPI / 2048.0f);
-        cosminusradplayerang = cos(-radplayerang);
-        sinminusradplayerang = sin(-radplayerang);
+        playerang = fix16_to_float(qglobalang&0x7FFFFFF) * (360.f/2048.f) - 90.0f;
+        radplayerang = fix16_to_float(qglobalang&0x7FFFFFF) * (2.0f * fPI / 2048.0f);
+        cosminusradplayerang = cosf(-radplayerang);
+        sinminusradplayerang = sinf(-radplayerang);
         hudzoom = 65536.0 / spriteext[tspr->owner].mdpivot_offset.z;
 
         glTranslatef(spos[0], spos[1], spos[2]);
@@ -5990,17 +6129,19 @@ static void polymer_invalidatesectorlights(int16_t const sectnum)
     polymer_invalidateplanelights(s->floor);
     polymer_invalidateplanelights(s->ceil);
 
-    int i = sec->wallnum;
+    int i = 0;
+    _prwall *w;
 
-    while (i--)
+    do
     {
-        _prwall *w;
-        if (!(w = prwalls[sec->wallptr + i])) continue;
+        w = prwalls[sec->wallptr + i];
+        if (!w) continue;
 
         polymer_invalidateplanelights(w->wall);
         polymer_invalidateplanelights(w->over);
         polymer_invalidateplanelights(w->mask);
     }
+    while (++i < sec->wallnum);
 }
 
 static void polymer_processspotlight(_prlight *const light)
@@ -6138,10 +6279,12 @@ static int polymer_culllight(int16_t lighti)
         }
 #endif
         int i = 0;
+
+
         do
         {
-            auto w    = prwalls[sec->wallptr + i];
-            auto wal  = (uwallptr_t)&wall[sec->wallptr + i];
+            auto w   = prwalls[sec->wallptr + i];
+            auto wal = (uwallptr_t)&wall[sec->wallptr + i];
             auto nsec = (wal->nextsector >= 0 && wal->nextsector < numsectors) ? (usectorptr_t)&sector[wal->nextsector] : nullptr;
 
             int j = 0;
@@ -6249,7 +6392,7 @@ static void         polymer_prepareshadows(void)
 
             // build globals used by rotatesprite
 
-            viewangle = fix16_from_int(getangle(gx - prlights[i].x, gy - prlights[i].y));
+            viewangle = gethiq16angle(gx - prlights[i].x, gy - prlights[i].y);
             set_globalang(viewangle);
             //viewangle = fix16_from_int(prlights[i].angle);
             //set_globalang(fix16_from_int(prlights[i].angle));
@@ -6263,7 +6406,7 @@ static void         polymer_prepareshadows(void)
 
             // to force sprite drawing
             mirrors[depth++].plane = NULL;
-            polymer_displayrooms(prlights[i].sector);
+            polymer_displayrooms(prlights[i].sector, i);
             depth--;
 
             overridematerial = oldoverridematerial;
@@ -6286,6 +6429,9 @@ static void         polymer_prepareshadows(void)
 
     viewangle = oviewangle;
     set_globalang(oglobalang);
+
+    Bmemset(gotsector, 0, sizeof(gotsector));
+    Bmemset(drawingstate, 0, sizeof(drawingstate));
 }
 
 // RENDER TARGETS

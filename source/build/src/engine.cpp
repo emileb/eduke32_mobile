@@ -181,7 +181,7 @@ int32_t showfirstwall=0;
 int32_t showheightindicators=1;
 int32_t circlewall=-1;
 
-static void classicScanSector(int16_t startsectnum);
+void classicScanSector(int16_t startsectnum);
 static void draw_rainbow_background(void);
 
 int16_t editstatus = 0;
@@ -1667,7 +1667,7 @@ static inline int findUnusedTile(void)
 //
 // scansector (internal)
 //
-static void classicScanSector(int16_t startsectnum)
+void classicScanSector(int16_t startsectnum)
 {
     if (startsectnum < 0)
         return;
@@ -2169,7 +2169,7 @@ static int32_t spriteobstructswall(spritetype *s, int32_t w)
 //
 // bunchfront (internal)
 //
-static inline int32_t bunchfront(int32_t b1, int32_t b2)
+int32_t bunchfront(int32_t b1, int32_t b2)
 {
     int b1f = bunchfirst[b1];
     int const x1b1 = xb1[b1f];
@@ -9307,10 +9307,10 @@ int32_t wallvisible(int32_t const x, int32_t const y, int16_t const wallnum)
     auto w1 = (uwallptr_t)&wall[wallnum];
     auto w2 = (uwallptr_t)&wall[w1->point2];
 
-    int32_t const a1 = getangle(w1->x - x, w1->y - y);
-    int32_t const a2 = getangle(w2->x - x, w2->y - y);
+    int32_t const a1 = gethiq16angle(w1->x - x, w1->y - y);
+    int32_t const a2 = gethiq16angle(w2->x - x, w2->y - y);
 
-    return (((a2 + (2048 - a1)) & 2047) <= 1024);
+    return (((a2 + (F16(2048) - a1)) & 0x7FFFFFF) <= F16(1024));
 }
 
 #if 0
@@ -12916,7 +12916,7 @@ int32_t setaspect_new_use_dimen = 0;
 
 void videoSetCorrectedAspect()
 {
-    if (r_usenewaspect && newaspect_enable && videoGetRenderMode() != REND_POLYMER)
+    if (r_usenewaspect && newaspect_enable/* && videoGetRenderMode() != REND_POLYMER*/)
     {
         // In DOS the game world is displayed with an aspect of 1.28 instead 1.333,
         // meaning we have to stretch it by a factor of 1.25 instead of 1.2
