@@ -2,18 +2,18 @@
 
 #if defined USE_OPENGL && defined POLYMER
 
-#include "compat.h"
-#include "common.h"
-
 #define POLYMER_C
-#include "polymer.h"
-#include "engine_priv.h"
-#include "xxhash.h"
-#include "texcache.h"
-
 #define LIBTESS2_IMPLEMENTATION
 
+#include "polymer.h"
+
+#include "common.h"
+#include "compat.h"
+#include "engine_priv.h"
 #include "libtess2.h"
+#include "texcache.h"
+#include "vectormath.hpp"
+#include "xxhash.h"
 
 // CVARS
 #ifdef __APPLE__
@@ -207,6 +207,8 @@ static const GLfloat  skyboxdata[4 * 5 * 6] =
 GLuint          skyboxdatavbo;
 
 GLfloat         artskydata[PSKYOFF_MAX*2];
+
+static int needsky;
 
 // LIGHTS
 static _prplanelist *plpool;
@@ -719,7 +721,7 @@ GLfloat         *curskymodelviewmatrix;
 static int16_t  sectorqueue[MAXSECTORS];
 static uint8_t  drawingstate[(MAXSECTORS+7)>>3];
 
-#define MAXQUERIES 256
+#define MAXQUERIES 512
 int16_t numqueries;
 
 int16_t         *cursectormasks;
@@ -1363,7 +1365,7 @@ void                polymer_editorpick(void)
             glGetIntegerv(GL_VIEWPORT, view);
 
             GLfloat bestwdistsq = (GLfloat)3.4e38, wdistsq;
-            GLfloat w1[2], w2[2], w21[2], pw1[2], pw2[2];
+            Vector2 w1, w2, w21, pw1, pw2;
             walltype *wal = &wall[sector[searchsector].wallptr];
             
             GLfloat dadepth;
@@ -1373,9 +1375,9 @@ void                polymer_editorpick(void)
             GLfloat scrx,scry,scrz;
             buildgl_unprojectMatrixToViewport({ fsearchx, fydim-fsearchy, 0.0},  model, proj, view,  &scrx, &scry, &scrz);
 
-            GLfloat scr[3]    = { scrx, scry, scrz };
-            GLfloat scrv[3]   = { x-scrx, y-scry, z-scrz };
-            GLfloat scrvxz[2] = { x-scrx, z-scrz };
+            Vector3 scr    = { scrx, scry, scrz };
+            Vector3 scrv   = { x-scrx, y-scry, z-scrz };
+            Vector2 scrvxz = { x-scrx, z-scrz };
 
             if (prsectors[searchsector]==NULL)
             {
@@ -1392,11 +1394,13 @@ void                polymer_editorpick(void)
                     return;
                 }
 
-                GLfloat t = dot3f(pl,scrv);
-                GLfloat svcoeff = -(dot3f(pl,scr)+pl[3])/t;
+                Vector3 vpl = { pl[0], pl[1], pl[2] };
+
+                GLfloat t = dot(vpl,scrv);
+                GLfloat svcoeff = -(dot(vpl,scr)+pl[3])/t;
 
                 // point on plane (x and z)
-                GLfloat p[2] = { scrx + svcoeff*scrv[0], scrz + svcoeff*scrv[2] };
+                Vector2 p = { scrx + svcoeff*scrv[0], scrz + svcoeff*scrv[2] };
                 int16_t bestk=0;
                 GLfloat w1d, w2d;
 
@@ -1407,27 +1411,27 @@ void                polymer_editorpick(void)
                     w2[1] = -(float)wall[wal[k].point2].x;
                     w2[0] = (float)wall[wal[k].point2].y;
 
-                    GLfloat scrvxznorm = Bsqrtf(dot2f(scrvxz,scrvxz));
-                    GLfloat scrvxzn[2] = { scrvxz[1]/scrvxznorm,
-                                          -scrvxz[0]/scrvxznorm };
-                    relvec2f(p,w1, pw1);
-                    relvec2f(p,w2, pw2);
-                    relvec2f(w2,w1, w21);
+                    GLfloat scrvxznorm = Bsqrtf(dot(scrvxz, scrvxz));
+                    Vector2 scrvxzn = { scrvxz[1]/scrvxznorm,
+                                       -scrvxz[0]/scrvxznorm };
+                    pw1 = w1 - p;
+                    pw2 = w2 - p;
+                    w21 = w1 - w2;
 
-                    w1d = dot2f(scrvxzn,pw1);
-                    w2d = dot2f(scrvxzn,pw2);
+                    w1d = dot(scrvxzn, pw1);
+                    w2d = dot(scrvxzn, pw2);
                     w2d = -w2d;
                     if (w1d <= 0 || w2d <= 0)
                         continue;
 
-                    GLfloat scrpxz[2];
-                    GLfloat ptonline[2] = { w2[0]+(w2d/(w1d+w2d))*w21[0], 
+                    Vector2 scrpxz;
+                    Vector2 ptonline = { w2[0]+(w2d/(w1d+w2d))*w21[0], 
                                             w2[1]+(w2d/(w1d+w2d))*w21[1] };
-                    relvec2f(p,ptonline, scrpxz);
-                    if (dot2f(scrvxz,scrpxz)<0)
+                    scrpxz = ptonline - p;
+                    if (dot(scrvxz, scrpxz) < 0)
                         continue;
 
-                    wdistsq = dot2f(scrpxz,scrpxz);
+                    wdistsq = dot(scrpxz, scrpxz);
                     if (wdistsq < bestwdistsq)
                     {
                         bestk = k;
@@ -1732,7 +1736,8 @@ void                polymer_deletelight(int16_t lighti)
         return;
     }
 
-    polymer_removelight(lighti);
+    if (prlights[lighti].planecount)
+        polymer_removelight(lighti);
 
     prlights[lighti].flags.active = 0;
 
@@ -1908,10 +1913,14 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
     cursectormasks = localsectormasks;
     cursectormaskcount = localsectormaskcount;
 
-    buildgl_setDisabled(GL_DEPTH_TEST);
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-    polymer_drawsky(cursky, curskypal, curskyshade);
-    buildgl_setEnabled(GL_DEPTH_TEST);
+    if (!lightidx && needsky)
+    {
+        buildgl_setDisabled(GL_DEPTH_TEST);
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        polymer_drawsky(cursky, curskypal, curskyshade);
+        buildgl_setEnabled(GL_DEPTH_TEST);
+        needsky = 0;
+    }
 
     // depth-only occlusion testing pass
 //     overridematerial = 0;
@@ -1927,6 +1936,7 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
     polymost_variable_soup();
     scansector_collectsprites = 0;
     polymost_scansector(dacursectnum);
+    polymer_pokesector(dacursectnum);
 
     while (numbunches > 0)
     {
@@ -1960,15 +1970,14 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
 
             if (((lightidx || depth) || (qstate[widx] & (Q_OCCLUDED|Q_DRAWN)) == 0) && wallvisible(globalposx, globalposy, wallnum))
             {
-                if (polymer_planeinfrustum(prwalls[wallnum]->mask, frustum)) 
+                int const ns = wall[wallnum].nextsector;
+
+                if ((wall[wallnum].cstat & 32) == 0 && ns != -1 && !bitmap_test(drawingstate, ns) && polymer_planeinfrustum(prwalls[wallnum]->mask, frustum))
                 {
-                    int const ns = wall[wallnum].nextsector;
-                    if ((wall[wallnum].cstat & 32) == 0 && ns != -1 && !bitmap_test(drawingstate, ns))
-                    {
-                        sectorqueue[back++] = ns;
-                        bitmap_set(drawingstate, ns);
-                        polymost_scansector(ns);
-                    }
+                    sectorqueue[back++] = ns;
+                    bitmap_set(drawingstate, ns);
+                    polymost_scansector(ns);
+                    polymer_pokesector(ns);
                 }
 
                 if (((prwalls[wallnum]->underover & 1) && polymer_planeinfrustum(prwalls[wallnum]->wall, frustum))
@@ -2000,8 +2009,10 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
     {
         auto sec = (usectorptr_t)&sector[sectorqueue[front]];
 
-        polymer_pokesector(sectorqueue[front]);
-        polymer_drawsector(sectorqueue[front], FALSE);
+        auto prsect = prsectors[sectorqueue[front]];
+        if (!prsect) { front++; continue;}
+
+        polymer_drawsector(sectorqueue[front], FALSE, frustum);
         polymer_scansprites(sectorqueue[front], localtsprite, &localspritesortcnt);
 
         int doquery = 0;
@@ -2015,8 +2026,6 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
                 doquery = 1;
         }
         while (++i < sec->wallnum);
-
-        auto prsect = prsectors[sectorqueue[front]];
 
         auto query = prsect->queries;
         auto qstate = prsect->qstate;
@@ -2083,6 +2092,7 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
                 {
                     sectorqueue[back++] = wal->nextsector;
                     bitmap_set(drawingstate, wal->nextsector);
+                    polymer_pokesector(wal->nextsector);
                 }
             }
             else if (((lightidx || depth) || ((qstate[i] & Q_WAITING) == 0 && numqueries < MAXQUERIES)) && wallvisible(globalposx, globalposy, sec->wallptr + i))
@@ -2093,12 +2103,10 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
                     //if (!query[0])
                     if (++numqueries >= MAXQUERIES)
                         OSD_Puts("!!numqueries\n");
-                    else
-                    {
-                        qstate[i] |= Q_WAITING;
-                        glGenQueries(1, &query[i]);
-                        glBeginQuery(GL_ANY_SAMPLES_PASSED, query[i]);
-                    }
+
+                    qstate[i] |= Q_WAITING;
+                    glGenQueries(1, &query[i]);
+                    glBeginQuery(GL_ANY_SAMPLES_PASSED, query[i]);
                 }
 
                 oldoverridematerial = overridematerial;
@@ -2178,7 +2186,7 @@ static void         polymer_displayrooms(const int16_t dacursectnum, int lightid
         {
             auto sec = (usectorptr_t)&sector[sectorqueue[front]];
 
-            polymer_drawsector(sectorqueue[front], 0);
+            polymer_drawsector(sectorqueue[front], 0, frustum);
 
             i = 0;
             while (i < sec->wallnum)
@@ -2631,11 +2639,8 @@ static void         polymer_freeboard(void)
             if (sect->queries)
             {
                 for (int j=0;j<sector[i].wallnum;j++)
-                    if (glIsQuery(sect->queries[j]))
-                    {
-                        numqueries--;
+                    if (sect->queries[j])
                         glDeleteQueries(1, &sect->queries[j]);
-                    }
 
                 Xaligned_free(sect->queries);
                 Xfree(sect->qstate);
@@ -2645,7 +2650,7 @@ static void         polymer_freeboard(void)
 
         i++;
     }
-
+    numqueries = 0;
     i = 0;
     while (i < MAXWALLS)
     {
@@ -3163,7 +3168,7 @@ static int32_t      polymer_buildfloor(int16_t sectnum)
     return 1;
 }
 
-static void polymer_drawsector(int16_t sectnum, int32_t domasks)
+static void polymer_drawsector(int16_t sectnum, int32_t domasks, float *frustum /*= nullptr*/)
 {
     if (pr_verbosity >= 3) OSD_Printf("PR : Drawing sector %i...\n", sectnum);
 
@@ -3176,25 +3181,6 @@ static void polymer_drawsector(int16_t sectnum, int32_t domasks)
     auto s          = prsectors[sectnum];
     int  queuedmask = FALSE;
 
-    // If you're thinking of 'optimizing' the following logic, you'd better
-    // provide compelling evidence that the generated code is more efficient
-    // than what GCC can come up with on its own.
-
-    int32_t draw = TRUE;
-
-    // Draw masks regardless; avoid all non-masks TROR links
-    if (sec->floorstat & 384) {
-        draw = domasks;
-    } else if (yax_getbunch(sectnum, YAX_FLOOR) >= 0) {
-        draw = FALSE;
-    }
-    // Parallaxed
-    if (sec->floorstat & 1) {
-        draw = FALSE;
-    }
-
-    GLubyte oldcolor[4];
-
     // this relies on getzsofslope() not clamping the x/y to the sector coordinates.
     // by calling getzsofslope with coordinates outside of the sector in question,
     // the slope is extended infinitely and we can test against it to determine visibility.
@@ -3202,50 +3188,93 @@ static void polymer_drawsector(int16_t sectnum, int32_t domasks)
     int32_t ceilZ, floorZ;
     getzsofslope(sectnum, globalposx, globalposy, &ceilZ, &floorZ);
 
-    if (globalposz <= floorZ) {
-        if (draw || (searchit == 2)) {
-            if (searchit == 2) {
-                polymer_drawsearchplane(&s->floor, oldcolor, 0x02, (GLubyte *) &sectnum);
+    // If you're thinking of 'optimizing' the following logic, you'd better
+    // provide compelling evidence that the generated code is more efficient
+    // than what GCC can come up with on its own.
+
+    int32_t draw = TRUE;
+    GLubyte oldcolor[4];
+
+    if (!frustum || polymer_planeinfrustum(s->floor, frustum))
+    {
+        // Draw masks regardless; avoid all non-masks TROR links
+        if (sec->floorstat & 384)
+        {
+            draw = domasks;
+        }
+        else if (yax_getbunch(sectnum, YAX_FLOOR) >= 0)
+        {
+            draw = FALSE;
+        }
+        // Parallaxed
+        if (sec->floorstat & 1)
+        {
+            draw    = FALSE;
+            if (overridematerial) needsky = 1;
+        }
+
+        if (globalposz <= floorZ)
+        {
+            if (draw || (searchit == 2))
+            {
+                if (searchit == 2)
+                {
+                    polymer_drawsearchplane(&s->floor, oldcolor, 0x02, (GLubyte *)&sectnum);
+                }
+                else
+                {
+                    calc_and_apply_fog(fogshade(sec->floorshade, sec->floorpal), sec->visibility, get_floor_fogpal(sec));
+                    polymer_drawplane(&s->floor);
+                }
             }
-            else {
-                calc_and_apply_fog(fogshade(sec->floorshade, sec->floorpal), sec->visibility,
-                    get_floor_fogpal(sec));
-                polymer_drawplane(&s->floor);
+            else if (!domasks && cursectormaskcount && sec->floorstat & 384)
+            {
+                // If we just skipped a mask, queue it for later
+                cursectormasks[(*cursectormaskcount)++] = sectnum;
+                // Don't queue it twice if the ceiling is also a mask, though.
+                queuedmask = TRUE;
             }
-        } else if (!domasks && cursectormaskcount && sec->floorstat & 384) {
-            // If we just skipped a mask, queue it for later
-            cursectormasks[(*cursectormaskcount)++] = sectnum;
-            // Don't queue it twice if the ceiling is also a mask, though.
-            queuedmask = TRUE;
         }
     }
 
-    draw = TRUE;
-    // Draw masks regardless; avoid all non-masks TROR links
-    if (sec->ceilingstat & 384) {
-        draw = domasks;
-    } else if (yax_getbunch(sectnum, YAX_CEILING) >= 0) {
-        draw = FALSE;
-    }
-    // Parallaxed
-    if (sec->ceilingstat & 1) {
-        draw = FALSE;
-    }
+    if (!frustum || polymer_planeinfrustum(s->ceil, frustum))
+    {
+        draw = TRUE;
+        // Draw masks regardless; avoid all non-masks TROR links
+        if (sec->ceilingstat & 384)
+        {
+            draw = domasks;
+        }
+        else if (yax_getbunch(sectnum, YAX_CEILING) >= 0)
+        {
+            draw = FALSE;
+        }
+        // Parallaxed
+        if (sec->ceilingstat & 1)
+        {
+            draw    = FALSE;
+            if (overridematerial) needsky = 1;
+        }
 
-    if (globalposz >= ceilZ) {
-        if (draw || (searchit == 2)) {
-            if (searchit == 2) {
-                polymer_drawsearchplane(&s->ceil, oldcolor, 0x01, (GLubyte *) &sectnum);
+        if (globalposz >= ceilZ)
+        {
+            if (draw || (searchit == 2))
+            {
+                if (searchit == 2)
+                {
+                    polymer_drawsearchplane(&s->ceil, oldcolor, 0x01, (GLubyte *)&sectnum);
+                }
+                else
+                {
+                    calc_and_apply_fog(fogshade(sec->ceilingshade, sec->ceilingpal), sec->visibility, get_ceiling_fogpal(sec));
+                    polymer_drawplane(&s->ceil);
+                }
             }
-            else {
-                calc_and_apply_fog(fogshade(sec->ceilingshade, sec->ceilingpal), sec->visibility,
-                                   get_ceiling_fogpal(sec));
-                polymer_drawplane(&s->ceil);
+            else if (!domasks && !queuedmask && cursectormaskcount && (sec->ceilingstat & 384))
+            {
+                // If we just skipped a mask, queue it for later
+                cursectormasks[(*cursectormaskcount)++] = sectnum;
             }
-        } else if (!domasks && !queuedmask && cursectormaskcount &&
-                   (sec->ceilingstat & 384)) {
-            // If we just skipped a mask, queue it for later
-            cursectormasks[(*cursectormaskcount)++] = sectnum;
         }
     }
 
@@ -5944,9 +5973,9 @@ static _prprograminfo *polymer_compileprogram(int32_t programbits)
 // LIGHTS
 static void         polymer_removelight(int16_t lighti)
 {
-    _prplanelist*   oldhead;
+    _prplanelist *oldhead;
 
-    while (prlights[lighti].planelist)
+    do
     {
         polymer_deleteplanelight(prlights[lighti].planelist->plane, lighti);
         oldhead = prlights[lighti].planelist;
@@ -5955,6 +5984,8 @@ static void         polymer_removelight(int16_t lighti)
         plpool = oldhead;
         plpool->plane = NULL;
     }
+    while (prlights[lighti].planelist);
+
     prlights[lighti].planecount = 0;
     prlights[lighti].planelist = NULL;
 }
@@ -5969,13 +6000,19 @@ static void         polymer_updatelights(void)
 
         if (light->flags.active && light->flags.invalidate) {
             // highly suboptimal
-            polymer_removelight(i);
 
-            if (light->radius)
+            if (prlights[i].planecount)
+                polymer_removelight(i);
+
+            if (light->radius && !light->flags.retry)
                 polymer_processspotlight(light);
             
             if (!polymer_culllight(i))
+            {
                 light->flags.invalidate = 0;
+                light->flags.retry = 0;
+            }
+            else light->flags.retry = 1;
         }
 
         if (light->flags.active) {
@@ -6192,7 +6229,14 @@ static int polymer_culllight(int16_t lighti)
     int32_t front = 0;
     int32_t back  = 1;
     int16_t bunchnum;
+    int16_t lightsect = prlights[lighti].sector;
 
+    int i=0;
+    for (;i<sector[lightsect].wallnum;i++)
+        if (prsectors[lightsect]->qstate[i] & Q_VISIBLE)
+            break;
+
+    if (i == sector[lightsect].wallnum) return 1;
     if (!sectorsareconnected(globalcursectnum, light.sector)) return 1;
 
     Bmemset(drawingstate, 0, sizeof(drawingstate));
@@ -6361,13 +6405,12 @@ static void         polymer_prepareshadows(void)
 
     int i=0, j=0, k=0;
 
-    while ((k < lightcount) && (j < pr_shadowcount))
+    while ((k < lightcount) && (j < pr_shadowcount) && (i < PR_MAXLIGHTS-1))
     {
-        while (!prlights[i].flags.active)
+        while ((!prlights[i].flags.active || !prlights[i].planecount) && (i < PR_MAXLIGHTS-1))
             i++;
 
-        if (prlights[i].radius && prlights[i].publicflags.emitshadow &&
-            prlights[i].flags.isinview)
+        if (prlights[i].radius && prlights[i].publicflags.emitshadow)
         {
             prlights[i].flags.isinview = 0;
             prlights[i].rtindex = j + 1;

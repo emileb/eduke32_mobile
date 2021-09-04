@@ -409,7 +409,7 @@ static void         polymer_freeboard(void);
 static int32_t      polymer_initsector(int16_t sectnum);
 static int32_t      polymer_updatesector(int16_t sectnum);
 static int32_t      polymer_buildfloor(int16_t sectnum);
-static void         polymer_drawsector(int16_t sectnum, int32_t domasks);
+static void         polymer_drawsector(int16_t sectnum, int32_t domasks, float *frustum = nullptr);
 // WALLS
 static int32_t      polymer_initwall(int16_t wallnum);
 static void         polymer_updatewall(int16_t wallnum);
@@ -456,14 +456,6 @@ static void         polymer_initrendertargets(int32_t count);
 #define INDICE(n) ((p->indices) ? (p->indices[(i+n)%(p->indicescount-1)]) : (((i+n)%(p->vertcount-1))))
 
 #define SWITCH_CULL_DIRECTION { culledface = (culledface == GL_FRONT) ? GL_BACK : GL_FRONT; glCullFace(culledface); }
-
-static FORCE_INLINE GLfloat dot2f(const GLfloat *v1, const GLfloat *v2) { return v1[0] * v2[0] + v1[1] * v2[1]; }
-static FORCE_INLINE GLfloat dot3f(const GLfloat *v1, const GLfloat *v2) { return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]; }
-static FORCE_INLINE void relvec2f(const GLfloat *v1, const GLfloat *v2, GLfloat *out)
-{
-    out[0] = v2[0] - v1[0];
-    out[1] = v2[1] - v1[1];
-}
 
 // the following from gle/vvector.h
 

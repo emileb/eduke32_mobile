@@ -13,8 +13,10 @@ typedef struct      s_prplanelist {
 }                   _prplanelist;
 
 #pragma pack(push,1)
-typedef struct      s_prlight {
-    union {
+typedef struct s_prlight
+{
+    union
+    {
         struct
         {
             int32_t x, y, z;
@@ -22,29 +24,41 @@ typedef struct      s_prlight {
         vec3_t xyz;
         vec2_t xy;
     };
-    int32_t         horiz, range;
-    int16_t         angle, faderadius, radius, sector;
-    uint8_t         color[3], priority;
-    int8_t          minshade, maxshade;
-    int16_t         tilenum, owner;
-    struct          {
-        int         emitshadow  : 1;
-        int         negative    : 1;
-    }               publicflags;
+
+    int32_t horiz, range;
+    int16_t angle, faderadius, radius, sector;
+    uint8_t color[3], priority;
+    int8_t  minshade, maxshade;
+    int16_t tilenum, owner;
+
+    struct
+    {
+        int emitshadow : 1;
+        int negative   : 1;
+    } publicflags;
+
     // internal members
-    float           proj[16];
-    float           transform[16];
-    float           frustum[5 * 4];
-    int32_t         rtindex;
-    struct          {
-        int         active      : 1;
-        int         invalidate  : 1;
-        int         isinview    : 1;
-    }               flags;
-    uint32_t        lightmap;
-    _prplanelist*   planelist;
-    int32_t         planecount;
-}                   _prlight;
+    float   proj[16];
+    float   transform[16];
+    float   frustum[5 * 4];
+    int32_t rtindex;
+    uint32_t lightmap;
+
+    struct
+    {
+        int active     : 1;
+        int invalidate : 1;
+        int isinview   : 1;
+        int retry      : 1;
+    } flags;
+
+    _prplanelist *planelist;
+    int32_t planecount;
+
+    uint8_t *sectmap;
+    uint8_t *wallmap;
+    uint8_t *spritemap;
+} _prlight;
 
 extern _prlight     prlights[PR_MAXLIGHTS];
 extern int32_t      lightcount;
