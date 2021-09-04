@@ -1018,6 +1018,7 @@ void G_AddGameLight(int spriteNum, int sectNum, vec3_t const &offset, int lightR
     UNREFERENCED_PARAMETER(sectNum);
     UNREFERENCED_CONST_PARAMETER(offset);
     UNREFERENCED_PARAMETER(lightRange);
+    UNREFERENCED_PARAMETER(lightHoriz);
     UNREFERENCED_PARAMETER(lightColor);
     UNREFERENCED_PARAMETER(lightPrio);
 #endif
@@ -1059,6 +1060,8 @@ void G_InterpolateLights(int smoothratio)
         pr_light.range = pr_actor.lightrange - mulscale16(65536 - smoothratio, pr_actor.lightrange - pr_actor.olightrange);
         pr_light.angle = pr_actor.lightang - mulscale16(65536 - smoothratio, ((pr_actor.lightang + 1024 - pr_actor.olightang) & 2047) - 1024);
     }
+#else
+    UNREFERENCED_PARAMETER(smoothratio);
 #endif
 }
 
@@ -8585,6 +8588,7 @@ next_sprite:
     }
 }
 
+#ifdef POLYMER
 static void G_DoEffectorLights(void)  // STATNUM 14
 {
     static int16_t lasti = -1;
@@ -8619,7 +8623,6 @@ in:
 
         switch (sprite[i].lotag)
         {
-#ifdef POLYMER
         case SE_49_POINT_LIGHT:
         {
             if (!A_CheckSpriteFlags(i, SFLAG_NOLIGHT) && videoGetRenderMode() == REND_POLYMER)
@@ -8789,14 +8792,12 @@ in:
 
             break;
         }
-#endif // POLYMER
         }
     }
 
     lasti = -1;
 }
 
-#ifdef POLYMER
 static void A_DoLight(int spriteNum)
 {
     auto const pSprite = &sprite[spriteNum];
@@ -9083,7 +9084,7 @@ static void A_DoLight(int spriteNum)
                     G_AddGameLight(spriteNum, pSprite->sectnum, { 0, 0, (pSprite->xrepeat<<4) }, (pSprite->xrepeat<<3), 0, 100, color, PR_LIGHT_PRIO_LOW);
             }
         }
-#endif
+#endif // EDUKE32_STANDALONE
     }
 }
 #endif // POLYMER
@@ -9337,7 +9338,9 @@ void G_MoveWorld(void)
 
     // XXX: Has to be before effectors, in particular movers?
     // TODO: lights in moving sectors ought to be interpolated
+#ifdef POLYMER
     G_DoEffectorLights();
+#endif
 
     {
         MICROPROFILE_SCOPEI("MoveWorld", "MoveEffectors", MP_YELLOW);
