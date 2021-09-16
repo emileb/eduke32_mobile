@@ -38,6 +38,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "compat.h"
 #include "drivers.h"
 #include "fx_man.h"
+#include "libasync_config.h"
 #include "linklist.h"
 #include "osd.h"
 #include "pitch.h"
@@ -49,6 +50,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 int MV_XMPInterpolation = XMP_INTERP_NEAREST;
 #endif
+
 
 static void MV_StopVoice(VoiceNode *voice);
 static void MV_ServiceVoc(void);
@@ -100,8 +102,7 @@ int MV_ErrorCode = MV_NotInstalled;
 fix16_t MV_GlobalVolume = fix16_one;
 fix16_t MV_VolumeSmoothFactor = fix16_one;
 
-int MV_Locked;
-
+thread_local int MV_Locked;
 char *MV_MusicBuffer;
 static void (*MV_MusicCallback)(void);
 
@@ -358,7 +359,8 @@ static inline void MV_EndService(void) { MV_Unlock(); }
 int MV_VoicePlaying(int handle)
 {
     Bassert(handle <= MV_MaxVoices);
-    return MV_Installed && MV_Handles[handle - MV_MINVOICEHANDLE] != nullptr;
+    auto voice = MV_Handles[handle - MV_MINVOICEHANDLE];
+    return MV_Installed && voice != nullptr && voice->next != nullptr && !voice->Paused;
 }
 
 int MV_KillAllVoices(void)
@@ -451,6 +453,7 @@ static inline void MV_FinishAllocation(VoiceNode* voice, uint32_t const allocsiz
 
     voice->rawdatasiz = allocsize;
     voice->rawdataptr = Xaligned_alloc(16, allocsize);
+    Bmemset(voice->rawdataptr, 0, allocsize);
 }
 
 VoiceNode *MV_AllocVoice(int priority, uint32_t allocsize /* = 0 */)
@@ -462,7 +465,7 @@ VoiceNode *MV_AllocVoice(int priority, uint32_t allocsize /* = 0 */)
     {
         auto voice = MV_GetLowestPriorityVoice();
 
-        if (voice != &VoiceList && voice->priority <= priority && voice->handle >= MV_MINVOICEHANDLE)
+        if (voice != &VoiceList && voice->priority <= priority && voice->handle >= MV_MINVOICEHANDLE && FX_SoundValidAndActive(voice->handle))
             MV_Kill(voice->handle);
 
         if (LL::Empty(&VoicePool))
@@ -485,12 +488,12 @@ VoiceNode *MV_AllocVoice(int priority, uint32_t allocsize /* = 0 */)
             handle = MV_MINVOICEHANDLE;
     } while (MV_Handles[handle - MV_MINVOICEHANDLE] != nullptr);
     MV_Handles[handle - MV_MINVOICEHANDLE] = voice;
-    MV_Unlock();
 
     voice->length = 0;
     voice->BlockLength = 0;
     voice->handle = handle;
     voice->next = voice->prev = nullptr;
+    MV_Unlock();
 
     if (allocsize)
         MV_FinishAllocation(voice, allocsize);
@@ -505,17 +508,10 @@ int MV_VoiceAvailable(int priority)
         return TRUE;
 
     MV_Lock();
-
     auto const voice = MV_GetLowestPriorityVoice();
-
-    if (voice == &VoiceList || voice->priority > priority)
-    {
-        MV_Unlock();
-        return FALSE;
-    }
-
     MV_Unlock();
-    return TRUE;
+
+    return (voice == &VoiceList || voice->priority > priority) ? FALSE : TRUE;
 }
 
 void MV_SetVoicePitch(VoiceNode *voice, uint32_t rate, int pitchoffset)
