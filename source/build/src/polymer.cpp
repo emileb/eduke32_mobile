@@ -763,6 +763,8 @@ int32_t             polymer_init(void)
         return 0;
     }
 
+    buildgl_resetStateAccounting();
+
     // clean up existing stuff since it will be initialized again if we're re-entering here
     polymer_uninit();
 
@@ -822,7 +824,7 @@ int32_t             polymer_init(void)
             }
 
             glGenTextures(1, &prhighpalookups[i][j].map);
-            polymost_bindTexture(GL_TEXTURE_3D, prhighpalookups[i][j].map);
+            buildgl_bindTexture(GL_TEXTURE_3D, prhighpalookups[i][j].map);
             glTexImage3D(GL_TEXTURE_3D,                // target
                             0,                            // mip level
                             GL_RGBA,                      // internalFormat
@@ -838,22 +840,13 @@ int32_t             polymer_init(void)
             glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-            polymost_bindTexture(GL_TEXTURE_3D, 0);
+            buildgl_bindTexture(GL_TEXTURE_3D, 0);
             j++;
         }
         i++;
     }
 
-    polymost_resetSamplers();
-
-#ifndef __APPLE__
-    if (glinfo.debugoutput) {
-        // Enable everything.
-        glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-        glDebugMessageCallbackARB((GLDEBUGPROCARB)polymer_debugoutputcallback, NULL);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
-    }
-#endif
+    buildgl_resetSamplerObjects();
 
     if (pr_verbosity >= 1) OSD_Printf("PR : Initialization complete in %d ms.\n", timerGetTicks()-t);
 
@@ -872,6 +865,10 @@ void                polymer_uninit(void)
 
     polymer_freeboard();
     polymer_initrendertargets(0);
+
+    if (skyboxdatavbo) glDeleteBuffers(1, &skyboxdatavbo);
+    if (prmapvbo) glDeleteBuffers(1, &prmapvbo);
+    if (prindexringvbo) glDeleteBuffers(1, &prindexringvbo);
 
     i = 0;
     while (i < MAXBASEPALS)
@@ -923,7 +920,7 @@ void                polymer_uninit(void)
     }
 
     if (pr_verbosity >= 2)
-        OSD_Printf("PR: freed %" PRIi64 " programs\n", prprogramptrs.size());
+        OSD_Printf("PR: freed %" PRIiPTR " programs\n", prprogramptrs.size());
 
     prprogramptrs.clear();
 }
@@ -945,7 +942,7 @@ void                polymer_setaspect(int32_t ang)
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    bgluPerspective(fang * (360.f/2048.f), aspect, 0.01f, 100.0f);
+    buildgl_setPerspective(fang * (360.f/2048.f), aspect, 0.01f, 100.0f);
 }
 
 void                polymer_glinit(void)
@@ -953,13 +950,13 @@ void                polymer_glinit(void)
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClearStencil(0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    glViewport(windowxy1.x, ydim-(windowxy2.y+1),windowxy2.x-windowxy1.x+1, windowxy2.y-windowxy1.y+1);
+    buildgl_setViewport(windowxy1.x, ydim-(windowxy2.y+1),windowxy2.x-windowxy1.x+1, windowxy2.y-windowxy1.y+1);
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
+    buildgl_setEnabled(GL_DEPTH_TEST);
+    buildgl_setDepthFunc(GL_LEQUAL);
 
-    glDisable(GL_BLEND);
-    glDisable(GL_ALPHA_TEST);
+    buildgl_setDisabled(GL_BLEND);
+    buildgl_setDisabled(GL_ALPHA_TEST);
 
     if (pr_wireframe)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -980,7 +977,7 @@ void                polymer_glinit(void)
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
-    glEnable(GL_CULL_FACE);
+    buildgl_setEnabled(GL_CULL_FACE);
 }
 
 void                polymer_resetlights(void)
@@ -1045,20 +1042,22 @@ void                polymer_loadboard(void)
     prwalldataoffset = numwalls * 2 * sizeof(_prvert);
 
     glGenBuffers(1, &prmapvbo);
-    glBindBuffer(GL_ARRAY_BUFFER, prmapvbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, prmapvbo);
     glBufferData(GL_ARRAY_BUFFER, prwalldataoffset + (numwalls * prwalldatasize), NULL, mapvbousage);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 
     glGenBuffers(1, &prindexringvbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, prindexringvbo);
+    buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, prindexringvbo);
 
     if (pr_buckets)
     {
+        if (prindexring)
+            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, prindexringsize * sizeof(GLuint), NULL, prindexringmapflags | GL_DYNAMIC_STORAGE_BIT);
         prindexring = (GLuint*)glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, prindexringsize * sizeof(GLuint), prindexringmapflags);
     }
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     i = 0;
     while (i < numsectors)
@@ -1086,18 +1085,18 @@ void                polymer_loadboard(void)
 int32_t polymer_printtext256(int32_t xpos, int32_t ypos, int16_t col, int16_t backcol, const char *name, char fontsize)
 {
     //POGOTODO: Polymer should implement this so it's no longer coupled with Polymost & reliant on the fixed-function pipeline
-    glEnable(GL_TEXTURE_2D);
+    buildgl_setEnabled(GL_TEXTURE_2D);
     int32_t returnVal = polymost_printtext256(xpos, ypos, col, backcol, name, fontsize);
-    glDisable(GL_TEXTURE_2D);
+    buildgl_setDisabled(GL_TEXTURE_2D);
     return returnVal;
 }
 
 void polymer_fillpolygon(int32_t npoints)
 {
     //POGOTODO: Polymer should implement this so it's no longer coupled with Polymost & reliant on the fixed-function pipeline
-    glEnable(GL_TEXTURE_2D);
+    buildgl_setEnabled(GL_TEXTURE_2D);
     polymost_fillpolygon(npoints);
-    glDisable(GL_TEXTURE_2D);
+    buildgl_setDisabled(GL_TEXTURE_2D);
 }
 
 // The parallaxed ART sky angle divisor corresponding to a horizfrac of 32768.
@@ -1283,9 +1282,9 @@ void polymer_drawrooms(int32_t daposx, int32_t daposy, int32_t daposz, fix16_t d
 
 void                polymer_drawmasks(void)
 {
-    glEnable(GL_ALPHA_TEST);
-    glEnable(GL_BLEND);
-//     glEnable(GL_POLYGON_OFFSET_FILL);
+    buildgl_setEnabled(GL_ALPHA_TEST);
+    buildgl_setEnabled(GL_BLEND);
+//     buildgl_setEnabled(GL_POLYGON_OFFSET_FILL);
 
 //     while (--spritesortcnt)
 //     {
@@ -1293,7 +1292,7 @@ void                polymer_drawmasks(void)
 //         polymer_drawsprite(spritesortcnt);
 //     }
 
-    glEnable(GL_CULL_FACE);
+    buildgl_setEnabled(GL_CULL_FACE);
 
     if (cursectormaskcount) {
         // We (kind of) queue sector masks near to far, so drawing them in reverse
@@ -1311,14 +1310,15 @@ void                polymer_drawmasks(void)
         DO_FREE_AND_NULL(cursectormasks);
     }
 
-    glDisable(GL_CULL_FACE);
+    buildgl_setDisabled(GL_CULL_FACE);
 
-//     glDisable(GL_POLYGON_OFFSET_FILL);
-    glDisable(GL_BLEND);
-    glDisable(GL_ALPHA_TEST);
+//     buildgl_setDisabled(GL_POLYGON_OFFSET_FILL);
+    buildgl_setDisabled(GL_BLEND);
+    buildgl_setDisabled(GL_ALPHA_TEST);
 
     //polymost_resetVertexPointers(1);
 }
+
 
 void                polymer_editorpick(void)
 {
@@ -1351,43 +1351,27 @@ void                polymer_editorpick(void)
 
         // Apologies to Plagman for littering here, but this feature is quite essential
         {
-            GLdouble model[16];
-            GLdouble proj[16];
+            GLfloat model[16];
+            glGetFloatv(GL_MODELVIEW_MATRIX, model);
+            GLfloat proj[16];
+            glGetFloatv(GL_PROJECTION_MATRIX, proj);
             GLint view[4];
-
-            GLdouble x,y,z;
-            GLfloat scr[3], scrv[3];
-            GLdouble scrx,scry,scrz;
-            GLfloat dadepth;
-
-            int16_t k, bestk=0;
-            GLfloat bestwdistsq = (GLfloat)3.4e38, wdistsq;
-            GLfloat w1[2], w2[2], w21[2], pw1[2], pw2[2];
-            GLfloat ptonline[2];
-            GLfloat scrvxz[2];
-            GLfloat scrvxznorm, scrvxzn[2], scrpxz[2];
-            GLfloat w1d, w2d;
-            walltype *wal = &wall[sector[searchsector].wallptr];
-
-            GLfloat t, svcoeff, p[2];
-            GLfloat *pl;
-
-            glGetDoublev(GL_MODELVIEW_MATRIX, model);
-            glGetDoublev(GL_PROJECTION_MATRIX, proj);
             glGetIntegerv(GL_VIEWPORT, view);
 
+            GLfloat bestwdistsq = (GLfloat)3.4e38, wdistsq;
+            GLfloat w1[2], w2[2], w21[2], pw1[2], pw2[2];
+            walltype *wal = &wall[sector[searchsector].wallptr];
+            
+            GLfloat dadepth;
             glReadPixels(searchx, ydim-searchy, 1,1, GL_DEPTH_COMPONENT, GL_FLOAT, &dadepth);
-            bgluUnProject(searchx, ydim-searchy, dadepth,  model, proj, view,  &x, &y, &z);
-            bgluUnProject(searchx, ydim-searchy, 0.0,  model, proj, view,  &scrx, &scry, &scrz);
+            GLfloat x,y,z;
+            buildgl_unprojectMatrixToViewport({ fsearchx, fydim-fsearchy, dadepth},  model, proj, view,  &x, &y, &z);
+            GLfloat scrx,scry,scrz;
+            buildgl_unprojectMatrixToViewport({ fsearchx, fydim-fsearchy, 0.0},  model, proj, view,  &scrx, &scry, &scrz);
 
-            scr[0]=scrx, scr[1]=scry, scr[2]=scrz;
-
-            scrv[0] = x-scrx;
-            scrv[1] = y-scry;
-            scrv[2] = z-scrz;
-
-            scrvxz[0] = x-scrx;
-            scrvxz[1] = z-scrz;
+            GLfloat scr[3]    = { scrx, scry, scrz };
+            GLfloat scrv[3]   = { x-scrx, y-scry, z-scrz };
+            GLfloat scrvxz[2] = { x-scrx, z-scrz };
 
             if (prsectors[searchsector]==NULL)
             {
@@ -1396,10 +1380,7 @@ void                polymer_editorpick(void)
             }
             else
             {
-                if (searchstat==1)
-                    pl = prsectors[searchsector]->ceil.plane;
-                else
-                    pl = prsectors[searchsector]->floor.plane;
+                auto pl = (searchstat==1) ? prsectors[searchsector]->ceil.plane:prsectors[searchsector]->floor.plane;
 
                 if (pl == NULL)
                 {
@@ -1407,24 +1388,24 @@ void                polymer_editorpick(void)
                     return;
                 }
 
-                t = dot3f(pl,scrv);
-                svcoeff = -(dot3f(pl,scr)+pl[3])/t;
+                GLfloat t = dot3f(pl,scrv);
+                GLfloat svcoeff = -(dot3f(pl,scr)+pl[3])/t;
 
                 // point on plane (x and z)
-                p[0] = scrx + svcoeff*scrv[0];
-                p[1] = scrz + svcoeff*scrv[2];
+                GLfloat p[2] = { scrx + svcoeff*scrv[0], scrz + svcoeff*scrv[2] };
+                int16_t bestk=0;
+                GLfloat w1d, w2d;
 
-                for (k=0; k<sector[searchsector].wallnum; k++)
+                for (int k=0; k<sector[searchsector].wallnum; k++)
                 {
                     w1[1] = -(float)wal[k].x;
                     w1[0] = (float)wal[k].y;
                     w2[1] = -(float)wall[wal[k].point2].x;
                     w2[0] = (float)wall[wal[k].point2].y;
 
-                    scrvxznorm = Bsqrtf(dot2f(scrvxz,scrvxz));
-                    scrvxzn[0] = scrvxz[1]/scrvxznorm;
-                    scrvxzn[1] = -scrvxz[0]/scrvxznorm;
-
+                    GLfloat scrvxznorm = Bsqrtf(dot2f(scrvxz,scrvxz));
+                    GLfloat scrvxzn[2] = { scrvxz[1]/scrvxznorm,
+                                          -scrvxz[0]/scrvxznorm };
                     relvec2f(p,w1, pw1);
                     relvec2f(p,w2, pw2);
                     relvec2f(w2,w1, w21);
@@ -1435,8 +1416,9 @@ void                polymer_editorpick(void)
                     if (w1d <= 0 || w2d <= 0)
                         continue;
 
-                    ptonline[0] = w2[0]+(w2d/(w1d+w2d))*w21[0];
-                    ptonline[1] = w2[1]+(w2d/(w1d+w2d))*w21[1];
+                    GLfloat scrpxz[2];
+                    GLfloat ptonline[2] = { w2[0]+(w2d/(w1d+w2d))*w21[0], 
+                                            w2[1]+(w2d/(w1d+w2d))*w21[1] };
                     relvec2f(p,ptonline, scrpxz);
                     if (dot2f(scrvxz,scrpxz)<0)
                         continue;
@@ -1471,8 +1453,8 @@ void                polymer_inb4rotatesprite(int16_t tilenum, char pal, int8_t s
     _prmaterial     rotatespritematerial;
 
     polymer_getbuildmaterial(&rotatespritematerial, tilenum, pal, shade, 0, method);
-
     rotatespritematerialbits = polymer_bindmaterial(&rotatespritematerial, NULL, 0);
+    buildgl_bindSamplerObject(0, PTH_CLAMPED | ((rotatespritematerialbits & prprogrambits[PR_BIT_ART_MAP].bit) ? PTH_INDEXED : 0));
 }
 
 void                polymer_postrotatesprite(void)
@@ -1512,7 +1494,7 @@ void                polymer_drawmaskwall(int32_t damaskwallcnt)
     wal = &wall[maskwall[damaskwallcnt]];
     w = prwalls[maskwall[damaskwallcnt]];
 
-    glEnable(GL_CULL_FACE);
+    buildgl_setEnabled(GL_CULL_FACE);
 
     if (searchit == 2) {
         polymer_drawsearchplane(&w->mask, oldcolor, 0x04, (GLubyte *)&maskwall[damaskwallcnt]);
@@ -1521,7 +1503,7 @@ void                polymer_drawmaskwall(int32_t damaskwallcnt)
         polymer_drawplane(&w->mask);
     }
 
-    glDisable(GL_CULL_FACE);
+    buildgl_setDisabled(GL_CULL_FACE);
 }
 
 void                polymer_drawsprite(int32_t snum)
@@ -1555,11 +1537,11 @@ void                polymer_drawsprite(int32_t snum)
         tile2model[Ptile2tile(tspr->picnum,tspr->pal)].framenum >= 0 &&
         !(spriteext[spritenum].flags & SPREXT_NOTMD))
     {
-        glEnable(GL_CULL_FACE);
+        buildgl_setEnabled(GL_CULL_FACE);
         SWITCH_CULL_DIRECTION;
         polymer_drawmdsprite(tspr);
         SWITCH_CULL_DIRECTION;
-        glDisable(GL_CULL_FACE);
+        buildgl_setDisabled(GL_CULL_FACE);
         return;
     }
 
@@ -1640,22 +1622,22 @@ void                polymer_drawsprite(int32_t snum)
     {
         if ((tspr->cstat & SPR_ALIGN_MASK)==SPR_FLOOR && (tspr->cstat & SPR_YFLIP))
             SWITCH_CULL_DIRECTION;
-        glEnable(GL_CULL_FACE);
+        buildgl_setEnabled(GL_CULL_FACE);
     }
 
     if ((!depth || mirrors[depth-1].plane) && !pr_ati_nodepthoffset)
-        glEnable(GL_POLYGON_OFFSET_FILL);
+        buildgl_setEnabled(GL_POLYGON_OFFSET_FILL);
 
     polymer_drawplane(&s->plane);
 
     if ((!depth || mirrors[depth-1].plane) && !pr_ati_nodepthoffset)
-        glDisable(GL_POLYGON_OFFSET_FILL);
+        buildgl_setDisabled(GL_POLYGON_OFFSET_FILL);
 
     if ((tspr->cstat & 64) && (tspr->cstat & SPR_ALIGN_MASK))
     {
         if ((tspr->cstat & SPR_ALIGN_MASK)==SPR_FLOOR && (tspr->cstat & SPR_YFLIP))
             SWITCH_CULL_DIRECTION;
-        glDisable(GL_CULL_FACE);
+        buildgl_setDisabled(GL_CULL_FACE);
     }
 }
 
@@ -1827,7 +1809,6 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
     int16_t         *localsectormasks;
     int16_t         *localsectormaskcount;
     int32_t         gx, gy, gz, px, py, pz;
-    GLdouble        plane[4];
     float           coeff;
 
     curmodelviewmatrix = localmodelviewmatrix;
@@ -1853,10 +1834,10 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
     cursectormasks = localsectormasks;
     cursectormaskcount = localsectormaskcount;
 
-    glDisable(GL_DEPTH_TEST);
+    buildgl_setDisabled(GL_DEPTH_TEST);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
     polymer_drawsky(cursky, curskypal, curskyshade);
-    glEnable(GL_DEPTH_TEST);
+    buildgl_setEnabled(GL_DEPTH_TEST);
 
     // depth-only occlusion testing pass
 //     overridematerial = 0;
@@ -1951,6 +1932,8 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
 
                             glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
                             glDepthMask(GL_FALSE);
+
+                            //buildgl_bindSamplerObject(0, PTH_DEPTH_SAMPLER);
 
                             glGenQueries(1, &queryid[sec->wallptr + i]);
                             glBeginQuery(GL_SAMPLES_PASSED, queryid[sec->wallptr + i]);
@@ -2094,15 +2077,15 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
 
-        plane[0] = mirrorlist[i].plane->plane[0];
-        plane[1] = mirrorlist[i].plane->plane[1];
-        plane[2] = mirrorlist[i].plane->plane[2];
-        plane[3] = mirrorlist[i].plane->plane[3];
+        GLdouble const plane[4] = { mirrorlist[i].plane->plane[0],
+                                    mirrorlist[i].plane->plane[1],
+                                    mirrorlist[i].plane->plane[2],
+                                    mirrorlist[i].plane->plane[3] };
 
         glClipPlane(GL_CLIP_PLANE0, plane);
         polymer_inb4mirror(mirrorlist[i].plane->buffer, mirrorlist[i].plane->plane);
         SWITCH_CULL_DIRECTION;
-        //glEnable(GL_CLIP_PLANE0);
+        //buildgl_setEnabled(GL_CLIP_PLANE0);
 
         if (mirrorlist[i].wallnum >= 0)
             renderPrepareMirror(globalposx, globalposy, globalposz, qglobalang, qglobalhoriz,
@@ -2144,7 +2127,7 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
 
         set_globalpos(gx, gy, gz);
 
-        glDisable(GL_CLIP_PLANE0);
+        buildgl_setDisabled(GL_CLIP_PLANE0);
         SWITCH_CULL_DIRECTION;
         glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
@@ -2174,9 +2157,9 @@ static void         polymer_displayrooms(const int16_t dacursectnum)
         if (mirrors[depth - 1].plane)
             display_mirror = 0;
 
-        glDisable(GL_CULL_FACE);
+        buildgl_setDisabled(GL_CULL_FACE);
         renderDrawMasks();
-        glEnable(GL_CULL_FACE);
+        buildgl_setEnabled(GL_CULL_FACE);
     }
 }
 
@@ -2187,11 +2170,11 @@ static void         polymer_emptybuckets(void)
     if (pr_buckets == 0)
         return;
 
-    glBindBuffer(GL_ARRAY_BUFFER, prmapvbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, prmapvbo);
     glVertexPointer(3, GL_FLOAT, sizeof(_prvert), NULL);
     glTexCoordPointer(2, GL_FLOAT, sizeof(_prvert), (GLvoid *)(3 * sizeof(GLfloat)));
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, prindexringvbo);
+    buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, prindexringvbo);
 
     uint32_t indexcount = 0;
     while (bucket != NULL)
@@ -2249,8 +2232,8 @@ static void         polymer_emptybuckets(void)
         bucket = bucket->next;
     }
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 
     prcanbucket = 0;
 }
@@ -2403,11 +2386,11 @@ static void         polymer_drawplane(_prplane* plane)
 
     if (planevbo)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, planevbo);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, planevbo);
         glVertexPointer(3, GL_FLOAT, sizeof(_prvert), (GLvoid *)(geomfbooffset));
         glTexCoordPointer(2, GL_FLOAT, sizeof(_prvert), (GLvoid *)(geomfbooffset + (3 * sizeof(GLfloat))));
         if (plane->indices)
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, plane->ivbo);
+            buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, plane->ivbo);
     } else {
         glVertexPointer(3, GL_FLOAT, sizeof(_prvert), &plane->buffer->x);
         glTexCoordPointer(2, GL_FLOAT, sizeof(_prvert), &plane->buffer->u);
@@ -2444,9 +2427,9 @@ static void         polymer_drawplane(_prplane* plane)
 
     if (planevbo)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
         if (plane->indices)
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 }
 
@@ -2607,13 +2590,13 @@ static int32_t      polymer_initsector(int16_t sectnum)
     glGenBuffers(1, &s->floor.ivbo);
     glGenBuffers(1, &s->ceil.ivbo);
 
-    glBindBuffer(GL_ARRAY_BUFFER, s->floor.vbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, s->floor.vbo);
     glBufferData(GL_ARRAY_BUFFER, sec->wallnum * sizeof(GLfloat) * 5, NULL, mapvbousage);
 
-    glBindBuffer(GL_ARRAY_BUFFER, s->ceil.vbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, s->ceil.vbo);
     glBufferData(GL_ARRAY_BUFFER, sec->wallnum * sizeof(GLfloat) * 5, NULL, mapvbousage);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 
     s->flags.empty = 1; // let updatesector know that everything needs to go
 
@@ -2860,9 +2843,9 @@ attributes:
     {
         if (pr_nullrender < 2)
         {
-            /*glBindBuffer(GL_ARRAY_BUFFER, s->floor.vbo);
+            /*buildgl_bindBuffer(GL_ARRAY_BUFFER, s->floor.vbo);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sec->wallnum * sizeof(GLfloat)* 5, s->floor.buffer);
-            glBindBuffer(GL_ARRAY_BUFFER, s->ceil.vbo);
+            buildgl_bindBuffer(GL_ARRAY_BUFFER, s->ceil.vbo);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sec->wallnum * sizeof(GLfloat)* 5, s->ceil.buffer);
             */
 
@@ -2871,12 +2854,12 @@ attributes:
 
             GLintptr sector_offset = s->floor.mapvbo_vertoffset * sizeof(_prvert);
             GLsizeiptr cur_sector_size = sec->wallnum * sizeof(_prvert);
-            glBindBuffer(GL_ARRAY_BUFFER, prmapvbo);
+            buildgl_bindBuffer(GL_ARRAY_BUFFER, prmapvbo);
             // floor
             glBufferSubData(GL_ARRAY_BUFFER, sector_offset, cur_sector_size, s->floor.buffer);
             // ceiling
             glBufferSubData(GL_ARRAY_BUFFER, sector_offset + cur_sector_size, cur_sector_size, s->ceil.buffer);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
         }
     }
 
@@ -2923,17 +2906,17 @@ finish:
             {
                 if (s->oldindicescount < s->indicescount)
                 {
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->floor.ivbo);
+                    buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->floor.ivbo);
                     glBufferData(GL_ELEMENT_ARRAY_BUFFER, s->indicescount * sizeof(GLushort), NULL, mapvbousage);
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->ceil.ivbo);
+                    buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->ceil.ivbo);
                     glBufferData(GL_ELEMENT_ARRAY_BUFFER, s->indicescount * sizeof(GLushort), NULL, mapvbousage);
                     s->oldindicescount = s->indicescount;
                 }
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->floor.ivbo);
+                buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->floor.ivbo);
                 glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, s->indicescount * sizeof(GLushort), s->floor.indices);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->ceil.ivbo);
+                buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, s->ceil.ivbo);
                 glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, s->indicescount * sizeof(GLushort), s->ceil.indices);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+                buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
             }
         }
         else needfloor = -1;
@@ -2954,39 +2937,6 @@ finish:
 
     return 0;
 }
-
-#if 0
-void PR_CALLBACK    polymer_tesserror(GLenum error)
-{
-    /* This callback is called by the tesselator whenever it raises an error.
-       GLU_TESS_ERROR6 is the "no error"/"null" error spam in e1l1 and others. */
-
-    if (pr_verbosity >= 1 && error != GLU_TESS_ERROR6) OSD_Printf("PR : Tesselation error number %i reported : %s.\n", error, bgluErrorString(errno));
-}
-
-void PR_CALLBACK    polymer_tessedgeflag(GLenum error)
-{
-    // Passing an edgeflag callback forces the tesselator to output a triangle list
-    UNREFERENCED_PARAMETER(error);
-}
-
-void PR_CALLBACK    polymer_tessvertex(void* vertex, void* sector)
-{
-    _prsector*      s;
-
-    s = (_prsector*)sector;
-
-    if (s->curindice >= s->indicescount)
-    {
-        if (pr_verbosity >= 2) OSD_Printf("PR : Indice overflow, extending the indices list... !\n");
-        s->indicescount++;
-        s->floor.indices = (GLushort *)Xrealloc(s->floor.indices, s->indicescount * sizeof(GLushort));
-        s->ceil.indices = (GLushort *)Xrealloc(s->ceil.indices, s->indicescount * sizeof(GLushort));
-    }
-    s->ceil.indices[s->curindice] = (intptr_t)vertex;
-    s->curindice++;
-}
-#endif // 
 
 static int32_t      polymer_buildfloor(int16_t sectnum)
 {
@@ -3182,19 +3132,19 @@ static int32_t      polymer_initwall(int16_t wallnum)
     glGenBuffers(1, &w->mask.vbo);
     glGenBuffers(1, &w->stuffvbo);
 
-    glBindBuffer(GL_ARRAY_BUFFER, w->wall.vbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, w->wall.vbo);
     glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat) * 5, NULL, mapvbousage);
 
-    glBindBuffer(GL_ARRAY_BUFFER, w->over.vbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, w->over.vbo);
     glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat) * 5, NULL, mapvbousage);
 
-    glBindBuffer(GL_ARRAY_BUFFER, w->mask.vbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, w->mask.vbo);
     glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat) * 5, NULL, mapvbousage);
 
-    glBindBuffer(GL_ARRAY_BUFFER, w->stuffvbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, w->stuffvbo);
     glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(GLfloat) * 5, NULL, mapvbousage);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 
     w->flags.empty = 1;
 
@@ -3631,17 +3581,17 @@ static void         polymer_updatewall(int16_t wallnum)
         const GLintptr thiswalloffset = prwalldataoffset + (prwalldatasize * wallnum);
         const GLintptr thisoveroffset = thiswalloffset + proneplanesize;
         const GLintptr thismaskoffset = thisoveroffset + proneplanesize;
-        glBindBuffer(GL_ARRAY_BUFFER, prmapvbo);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, prmapvbo);
         glBufferSubData(GL_ARRAY_BUFFER, thiswalloffset, proneplanesize, w->wall.buffer);
-        glBindBuffer(GL_ARRAY_BUFFER, prmapvbo);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, prmapvbo);
         if (w->over.buffer)
             glBufferSubData(GL_ARRAY_BUFFER, thisoveroffset, proneplanesize, w->over.buffer);
-        glBindBuffer(GL_ARRAY_BUFFER, prmapvbo);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, prmapvbo);
         glBufferSubData(GL_ARRAY_BUFFER, thismaskoffset, proneplanesize, w->mask.buffer);
-        glBindBuffer(GL_ARRAY_BUFFER, w->stuffvbo);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, w->stuffvbo);
         glBufferSubData(GL_ARRAY_BUFFER, 0, 4 * sizeof(GLfloat)* 5, w->bigportal);
         //glBufferSubData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat)* 5, 4 * sizeof(GLfloat)* 3, w->cap);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 
         w->wall.mapvbo_vertoffset = thiswalloffset / sizeof(_prvert);
         w->over.mapvbo_vertoffset = thisoveroffset / sizeof(_prvert);
@@ -3712,12 +3662,12 @@ static void         polymer_drawwall(int16_t sectnum, int16_t wallnum)
     //{
     //    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
-    //    glBindBuffer(GL_ARRAY_BUFFER, w->stuffvbo);
+    //    buildgl_bindBuffer(GL_ARRAY_BUFFER, w->stuffvbo);
     //    glVertexPointer(3, GL_FLOAT, 0, (const GLvoid*)(4 * sizeof(GLfloat) * 5));
 
     //    glDrawArrays(GL_QUADS, 0, 4);
 
-    //    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //    buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 
     //    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     //}
@@ -3765,7 +3715,7 @@ static void         polymer_computeplane(_prplane* p)
         vec2[3] = buffer[index2].u - buffer[index1].u; //s2
         vec2[4] = buffer[index2].v - buffer[index1].v; //t2
 
-        polymer_crossproduct(vec2, vec1, plane);
+        buildgl_crossproduct(vec2, vec1, plane);
 
         norm = plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2];
 
@@ -3790,14 +3740,14 @@ static void         polymer_computeplane(_prplane* p)
             tangent[0][1] = (vec2[4] * vec1[1] - vec1[4] * vec2[1]) * r;
             tangent[0][2] = (vec2[4] * vec1[2] - vec1[4] * vec2[2]) * r;
 
-            polymer_normalize(&tangent[0][0]);
+            buildgl_normalize(&tangent[0][0]);
 
             // bitangent
             tangent[1][0] = (vec1[3] * vec2[0] - vec2[3] * vec1[0]) * r;
             tangent[1][1] = (vec1[3] * vec2[1] - vec2[3] * vec1[1]) * r;
             tangent[1][2] = (vec1[3] * vec2[2] - vec2[3] * vec1[2]) * r;
 
-            polymer_normalize(&tangent[1][0]);
+            buildgl_normalize(&tangent[1][0]);
 
             // normal
             tangent[2][0] = plane[0];
@@ -3814,12 +3764,6 @@ static void         polymer_computeplane(_prplane* p)
           (!p->indices && i < p->vertcount));
 }
 
-static FORCE_INLINE void  polymer_crossproduct(const GLfloat* in_a, const GLfloat* in_b, GLfloat* out)
-{
-    out[0] = in_a[1] * in_b[2] - in_a[2] * in_b[1];
-    out[1] = in_a[2] * in_b[0] - in_a[0] * in_b[2];
-    out[2] = in_a[0] * in_b[1] - in_a[1] * in_b[0];
-}
 
 static inline void  polymer_transformpoint(const float* inpos, float* pos, const float* matrix)
 {
@@ -3835,17 +3779,6 @@ static inline void  polymer_transformpoint(const float* inpos, float* pos, const
              inpos[1] * matrix[6] +
              inpos[2] * matrix[10] +
                       + matrix[14];
-}
-
-static inline void  polymer_normalize(float* vec)
-{
-    float norm = vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2];
-
-    norm = 1.f/Bsqrtf(norm);
-
-    vec[0] *= norm;
-    vec[1] *= norm;
-    vec[2] *= norm;
 }
 
 static inline void  polymer_pokesector(int16_t const sectnum)
@@ -3982,7 +3915,7 @@ void                polymer_updatesprite(int32_t snum)
         if (pr_nullrender < 2)
         {
             glGenBuffers(1, &s->plane.vbo);
-            glBindBuffer(GL_ARRAY_BUFFER, s->plane.vbo);
+            buildgl_bindBuffer(GL_ARRAY_BUFFER, s->plane.vbo);
             glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(_prvert), NULL, mapvbousage);
         }
     }
@@ -4179,9 +4112,9 @@ void                polymer_updatesprite(int32_t snum)
     {
         if (alignmask)
         {
-            glBindBuffer(GL_ARRAY_BUFFER, s->plane.vbo);
+            buildgl_bindBuffer(GL_ARRAY_BUFFER, s->plane.vbo);
             glBufferSubData(GL_ARRAY_BUFFER, 0, 4 * sizeof(_prvert), s->plane.buffer);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
         }
         else if (s->plane.vbo) // clean up the vbo if a wall/floor sprite becomes a face sprite
         {
@@ -4355,30 +4288,26 @@ static void         polymer_drawartsky(int16_t tilenum, char palnum, int8_t shad
         i++;
     }
 
-    glEnable(GL_TEXTURE_2D);
+    buildgl_setEnabled(GL_TEXTURE_2D);
     i = 0;
     j = 0;
     int32_t const increment = PSKYOFF_MAX>>max(3, dapskybits);  // In Polymer, an ART sky has 8 or 16 sides...
+    buildgl_bindSamplerObject(0, PTH_TEMP_SKY_HACK);
     while (i < PSKYOFF_MAX)
     {
-        GLint oldswrap;
         // ... but in case a multi-psky specifies less than 8, repeat cyclically:
         const int8_t tileofs = j&numskytilesm1;
 
         glColor4f(glcolors[tileofs][0], glcolors[tileofs][1], glcolors[tileofs][2], 1.0f);
-        polymost_bindTexture(GL_TEXTURE_2D, glpics[tileofs]);
-
-        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, &oldswrap);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-
+        buildgl_bindTexture(GL_TEXTURE_2D, glpics[tileofs]);
         polymer_drawartskyquad(i, (i + increment) & (PSKYOFF_MAX - 1), height);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, oldswrap);
 
         i += increment;
         ++j;
     }
-    glDisable(GL_TEXTURE_2D);
+
+    buildgl_bindSamplerObject(0, 0);
+    buildgl_setDisabled(GL_TEXTURE_2D);
 }
 
 static void         polymer_drawartskyquad(int32_t p1, int32_t p2, GLfloat height)
@@ -4409,13 +4338,13 @@ static void         polymer_drawskybox(int16_t tilenum, char palnum, int8_t shad
     {
         glGenBuffers(1, &skyboxdatavbo);
 
-        glBindBuffer(GL_ARRAY_BUFFER, skyboxdatavbo);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, skyboxdatavbo);
         glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(GLfloat) * 5 * 6, skyboxdata, modelvbousage);
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, skyboxdatavbo);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, skyboxdatavbo);
 
     tileUpdatePicnum(&tilenum, 0);
 
@@ -4450,18 +4379,18 @@ static void         polymer_drawskybox(int16_t tilenum, char palnum, int8_t shad
         }
 
         glColor4f(color[0], color[1], color[2], 1.0);
-        glEnable(GL_TEXTURE_2D);
-        polymost_bindTexture(GL_TEXTURE_2D, pth ? pth->glpic : 0);
+        buildgl_setEnabled(GL_TEXTURE_2D);
+        buildgl_bindTexture(GL_TEXTURE_2D, pth ? pth->glpic : 0);
         glVertexPointer(3, GL_FLOAT, 5 * sizeof(GLfloat), (GLfloat*)(4 * 5 * i * sizeof(GLfloat)));
         glTexCoordPointer(2, GL_FLOAT, 5 * sizeof(GLfloat), (GLfloat*)(((4 * 5 * i) + 3) * sizeof(GLfloat)));
         glDrawArrays(GL_QUADS, 0, 4);
-        glDisable(GL_TEXTURE_2D);
+        buildgl_setDisabled(GL_TEXTURE_2D);
 
         i++;
     }
     drawingskybox = 0;
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 // MDSPRITES
@@ -4842,10 +4771,10 @@ static void         polymer_drawmdsprite(tspriteptr_t tspr)
 
         glEnableClientState(GL_NORMAL_ARRAY);
 
-        glBindBuffer(GL_ARRAY_BUFFER, m->texcoords[surfi]);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, m->texcoords[surfi]);
         glTexCoordPointer(2, GL_FLOAT, 0, 0);
 
-        glBindBuffer(GL_ARRAY_BUFFER, m->geometry[surfi]);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, m->geometry[surfi]);
         glVertexPointer(3, GL_FLOAT, sizeof(float) * 15, (GLfloat*)(m->cframe * s->numverts * sizeof(float) * 15));
         glNormalPointer(GL_FLOAT, sizeof(float) * 15, (GLfloat*)(m->cframe * s->numverts * sizeof(float) * 15) + 3);
 
@@ -4855,7 +4784,7 @@ static void         polymer_drawmdsprite(tspriteptr_t tspr)
             mdspritematerial.nextframedata = (GLfloat*)(m->nframe * s->numverts * sizeof(float) * 15);
         }
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->indices[surfi]);
+        buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->indices[surfi]);
 
         curlight = 0;
         do {
@@ -4864,8 +4793,8 @@ static void         polymer_drawmdsprite(tspriteptr_t tspr)
             polymer_unbindmaterial(materialbits);
         } while ((++curlight < modellightcount) && (curlight < pr_maxlightpasses));
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
 
         glDisableClientState(GL_NORMAL_ARRAY);
     }
@@ -4897,18 +4826,18 @@ static void         polymer_loadmodelvbos(md3model_t* m)
     {
         s = &m->head.surfs[i];
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->indices[i]);
+        buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->indices[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, s->numtris * sizeof(md3tri_t), s->tris, modelvbousage);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        buildgl_bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-        glBindBuffer(GL_ARRAY_BUFFER, m->texcoords[i]);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, m->texcoords[i]);
         glBufferData(GL_ARRAY_BUFFER, s->numverts * sizeof(md3uv_t), s->uv, modelvbousage);
 
-        glBindBuffer(GL_ARRAY_BUFFER, m->geometry[i]);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, m->geometry[i]);
         glBufferData(GL_ARRAY_BUFFER, s->numframes * s->numverts * sizeof(float) * (15), s->geometry, modelvbousage);
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
         i++;
     }
 }
@@ -4975,7 +4904,7 @@ static void         polymer_setupartmap(int16_t tilenum, char pal, int32_t meth)
         }
 
         glGenTextures(1, &prartmaps[tilenum]);
-        polymost_bindTexture(GL_TEXTURE_2D, prartmaps[tilenum]);
+        buildgl_bindTexture(GL_TEXTURE_2D, prartmaps[tilenum]);
         glTexImage2D(GL_TEXTURE_2D,
             0,
             GL_RED,
@@ -4989,13 +4918,13 @@ static void         polymer_setupartmap(int16_t tilenum, char pal, int32_t meth)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, meth & DAMETH_CLAMPED ? GL_CLAMP_TO_EDGE : GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, meth & DAMETH_CLAMPED ? GL_CLAMP_TO_EDGE : GL_REPEAT);
-        polymost_bindTexture(GL_TEXTURE_2D, 0);
+        buildgl_bindTexture(GL_TEXTURE_2D, 0);
         Xfree(tempbuffer);
     }
 
     if (!prbasepalmaps[curbasepal]) {
         glGenTextures(1, &prbasepalmaps[curbasepal]);
-        polymost_bindTexture(GL_TEXTURE_2D, prbasepalmaps[curbasepal]);
+        buildgl_bindTexture(GL_TEXTURE_2D, prbasepalmaps[curbasepal]);
         glTexImage2D(GL_TEXTURE_2D,
             0,
             GL_RGB,
@@ -5009,12 +4938,12 @@ static void         polymer_setupartmap(int16_t tilenum, char pal, int32_t meth)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        polymost_bindTexture(GL_TEXTURE_2D, 0);
+        buildgl_bindTexture(GL_TEXTURE_2D, 0);
     }
 
     if (!prlookups[pal]) {
         glGenTextures(1, &prlookups[pal]);
-        polymost_bindTexture(GL_TEXTURE_RECTANGLE_ARB, prlookups[pal]);
+        buildgl_bindTexture(GL_TEXTURE_RECTANGLE_ARB, prlookups[pal]);
         glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,
             0,
             GL_RED,
@@ -5028,7 +4957,7 @@ static void         polymer_setupartmap(int16_t tilenum, char pal, int32_t meth)
         glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        polymost_bindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+        buildgl_bindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
     }
 }
 
@@ -5268,11 +5197,12 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
     // --------- program compiling
     auto &prprogram = *polymer_getprogram(programbits);
 
-    polymost_useShaderProgram(prprogram.handle);
+    buildgl_useShaderProgram(prprogram.handle);
 
     // --------- bit setup
 
     texunit = 0;
+    buildgl_bindSamplerObject(texunit, programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : PTH_HIGHTILE);
 
     // PR_BIT_ANIM_INTERPOLATION
     if (programbits & prprogrambits[PR_BIT_ANIM_INTERPOLATION].bit)
@@ -5314,10 +5244,10 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
         pos[1] = fglobalposz * (-1.f/16.f);
         pos[2] = -fglobalposx;
 
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : PTH_HIGHTILE);
 
-        polymost_bindTexture(GL_TEXTURE_2D, material->normalmap);
+        buildgl_bindTexture(GL_TEXTURE_2D, material->normalmap);
 
         if (material->mdspritespace == GL_TRUE) {
             float mdspritespacepos[3];
@@ -5358,25 +5288,25 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
     // PR_BIT_ART_MAP
     if (programbits & prprogrambits[PR_BIT_ART_MAP].bit)
     {
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_2D, material->artmap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, PTH_INDEXED);
+        buildgl_bindTexture(GL_TEXTURE_2D, material->artmap);
 
         glUniform1i(prprogram.uniform_artMap, texunit);
 
         texunit++;
 
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_2D, material->basepalmap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, PTH_INDEXED|PTH_CLAMPED);
+        buildgl_bindTexture(GL_TEXTURE_2D, material->basepalmap);
 
         glUniform1i(prprogram.uniform_basePalMap, texunit);
 
         texunit++;
 
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_RECTANGLE_ARB, material->lookupmap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, PTH_INDEXED|PTH_CLAMPED);
+        buildgl_bindTexture(GL_TEXTURE_RECTANGLE_ARB, material->lookupmap);
 
         glUniform1i(prprogram.uniform_lookupMap, texunit);
 
@@ -5407,9 +5337,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
     // PR_BIT_DIFFUSE_MAP
     if (programbits & prprogrambits[PR_BIT_DIFFUSE_MAP].bit)
     {
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_2D, material->diffusemap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit,programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : PTH_HIGHTILE);
+        buildgl_bindTexture(GL_TEXTURE_2D, material->diffusemap);
 
         glUniform1i(prprogram.uniform_diffuseMap, texunit);
         glUniform2fv(prprogram.uniform_diffuseScale, 1, material->diffusescale);
@@ -5420,9 +5350,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
     // PR_BIT_HIGHPALOOKUP_MAP
     if (programbits & prprogrambits[PR_BIT_HIGHPALOOKUP_MAP].bit)
     {
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_3D, material->highpalookupmap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, PTH_CLAMPED);
+        buildgl_bindTexture(GL_TEXTURE_3D, material->highpalookupmap);
 
         glUniform1i(prprogram.uniform_highPalookupMap, texunit);
 
@@ -5444,9 +5374,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
             scale[1] = material->detailscale[1];
         }
 
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_2D, material->detailmap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, PTH_HIGHTILE);
+        buildgl_bindTexture(GL_TEXTURE_2D, material->detailmap);
 
         glUniform1i(prprogram.uniform_detailMap, texunit);
         glUniform2fv(prprogram.uniform_detailScale, 1, scale);
@@ -5466,9 +5396,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
     // PR_BIT_SPECULAR_MAP
     if (programbits & prprogrambits[PR_BIT_SPECULAR_MAP].bit)
     {
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_2D, material->specmap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : PTH_HIGHTILE);
+        buildgl_bindTexture(GL_TEXTURE_2D, material->specmap);
 
         glUniform1i(prprogram.uniform_specMap, texunit);
 
@@ -5491,9 +5421,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
     // PR_BIT_MIRROR_MAP
     if (programbits & prprogrambits[PR_BIT_MIRROR_MAP].bit)
     {
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_RECTANGLE_ARB, material->mirrormap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, PTH_CLAMPED);
+        buildgl_bindTexture(GL_TEXTURE_RECTANGLE_ARB, material->mirrormap);
 
         glUniform1i(prprogram.uniform_mirrorMap, texunit);
 
@@ -5508,9 +5438,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
     // PR_BIT_GLOW_MAP
     if (programbits & prprogrambits[PR_BIT_GLOW_MAP].bit)
     {
-        polymost_activeTexture(texunit + GL_TEXTURE0);
-        polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-        polymost_bindTexture(GL_TEXTURE_2D, material->glowmap);
+        buildgl_activeTexture(texunit + GL_TEXTURE0);
+        buildgl_bindSamplerObject(texunit, PTH_HIGHTILE|PTH_CLAMPED);
+        buildgl_bindTexture(GL_TEXTURE_2D, material->glowmap);
 
         glUniform1i(prprogram.uniform_glowMap, texunit);
 
@@ -5578,9 +5508,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
                 // PR_BIT_SHADOW_MAP
                 if (programbits & prprogrambits[PR_BIT_SHADOW_MAP].bit)
                 {
-                    polymost_activeTexture(texunit + GL_TEXTURE0);
-                    polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-                    polymost_bindTexture(prrts[prlights[lights[curlight]].rtindex].target, prrts[prlights[lights[curlight]].rtindex].z);
+                    buildgl_activeTexture(texunit + GL_TEXTURE0);
+                    buildgl_bindSamplerObject(texunit, PTH_DEPTH_SAMPLER);
+                    buildgl_bindTexture(prrts[prlights[lights[curlight]].rtindex].target, prrts[prlights[lights[curlight]].rtindex].z);
 
                     glUniform1i(prprogram.uniform_shadowMap, texunit);
 
@@ -5590,9 +5520,9 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
                 // PR_BIT_LIGHT_MAP
                 if (programbits & prprogrambits[PR_BIT_LIGHT_MAP].bit)
                 {
-                    polymost_activeTexture(texunit + GL_TEXTURE0);
-                    polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
-                    polymost_bindTexture(GL_TEXTURE_2D, prlights[lights[curlight]].lightmap);
+                    buildgl_activeTexture(texunit + GL_TEXTURE0);
+                    buildgl_bindSamplerObject(texunit, PTH_CLAMPED);
+                    buildgl_bindTexture(GL_TEXTURE_2D, prlights[lights[curlight]].lightmap);
 
                     glUniform1i(prprogram.uniform_lightMap, texunit);
 
@@ -5627,8 +5557,7 @@ static int32_t      polymer_bindmaterial(const _prmaterial *material, const int1
         glLightfv(GL_LIGHT0, GL_LINEAR_ATTENUATION, &range[1]);
     }
 
-    polymost_activeTexture(GL_TEXTURE0);
-    polymost_bindSampler(programbits & prprogrambits[PR_BIT_ART_MAP].bit ? PTH_INDEXED : 0);
+    buildgl_activeTexture(GL_TEXTURE0);
 
     return programbits;
 }
@@ -5660,7 +5589,7 @@ static void         polymer_unbindmaterial(int32_t programbits)
         glDisableVertexAttribArray(prprogram.attrib_N);
     }
 
-    polymost_useShaderProgram(0);
+    buildgl_useShaderProgram(0);
 }
 
 static _prprograminfo *polymer_compileprogram(int32_t programbits)
@@ -6092,7 +6021,7 @@ static void polymer_processspotlight(_prlight *const light)
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
-    bgluPerspective(radius * 2, 1, 0.1f, light->range * (1.f/1000.f));
+    buildgl_setPerspective(radius * 2, 1, 0.1f, light->range * (1.f/1000.f));
     glGetFloatv(GL_PROJECTION_MATRIX, light->proj);
     glPopMatrix();
 
@@ -6303,7 +6232,7 @@ static void         polymer_prepareshadows(void)
             glMatrixMode(GL_MODELVIEW);
             glLoadMatrixf(prlights[i].transform);
 
-            glEnable(GL_POLYGON_OFFSET_FILL);
+            buildgl_setEnabled(GL_POLYGON_OFFSET_FILL);
             glPolygonOffset(5, SHADOW_DEPTH_OFFSET);
 
             set_globalpos(prlights[i].x, prlights[i].y, prlights[i].z);
@@ -6329,7 +6258,7 @@ static void         polymer_prepareshadows(void)
 
             overridematerial = oldoverridematerial;
 
-            glDisable(GL_POLYGON_OFFSET_FILL);
+            buildgl_setDisabled(GL_POLYGON_OFFSET_FILL);
 
             glMatrixMode(GL_PROJECTION);
             glPopMatrix();
@@ -6394,7 +6323,7 @@ static void         polymer_initrendertargets(int32_t count)
             prrts[i].ydim = ydim;
 
             glGenTextures(1, &prrts[i].color);
-            polymost_bindTexture(prrts[i].target, prrts[i].color);
+            buildgl_bindTexture(prrts[i].target, prrts[i].color);
 
             glTexImage2D(prrts[i].target, 0, GL_RGB, prrts[i].xdim, prrts[i].ydim, 0, GL_RGB, GL_SHORT, NULL);
             glTexParameteri(prrts[i].target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -6409,7 +6338,7 @@ static void         polymer_initrendertargets(int32_t count)
 
             if (pr_ati_fboworkaround) {
                 glGenTextures(1, &prrts[i].color);
-                polymost_bindTexture(prrts[i].target, prrts[i].color);
+                buildgl_bindTexture(prrts[i].target, prrts[i].color);
 
                 glTexImage2D(prrts[i].target, 0, GL_RGB, prrts[i].xdim, prrts[i].ydim, 0, GL_RGB, GL_SHORT, NULL);
                 glTexParameteri(prrts[i].target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -6420,7 +6349,7 @@ static void         polymer_initrendertargets(int32_t count)
         }
 
         glGenTextures(1, &prrts[i].z);
-        polymost_bindTexture(prrts[i].target, prrts[i].z);
+        buildgl_bindTexture(prrts[i].target, prrts[i].z);
 
         glTexImage2D(prrts[i].target, 0, GL_DEPTH_COMPONENT, prrts[i].xdim, prrts[i].ydim, 0, GL_DEPTH_COMPONENT, GL_SHORT, NULL);
         glTexParameteri(prrts[i].target, GL_TEXTURE_MIN_FILTER, pr_shadowfiltering ? GL_LINEAR : GL_NEAREST);
@@ -6448,26 +6377,10 @@ static void         polymer_initrendertargets(int32_t count)
             OSD_Printf("PR : FBO #%d initialization failed.\n", i);
         }
 
-        polymost_bindTexture(prrts[i].target, 0);
+        buildgl_bindTexture(prrts[i].target, 0);
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
         i++;
-    }
-}
-
-// DEBUG OUTPUT
-void PR_CALLBACK    polymer_debugoutputcallback(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,GLvoid *userParam)
-{
-    UNREFERENCED_PARAMETER(source);
-    UNREFERENCED_PARAMETER(type);
-    UNREFERENCED_PARAMETER(id);
-    UNREFERENCED_PARAMETER(severity);
-    UNREFERENCED_PARAMETER(length);
-    UNREFERENCED_PARAMETER(userParam);
-
-    if (type == GL_DEBUG_TYPE_ERROR_ARB)
-    {
-        OSD_Printf("PR : Received OpenGL debug message: %s\n", message);
     }
 }
 

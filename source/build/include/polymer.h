@@ -411,9 +411,7 @@ static void         polymer_updatewall(int16_t wallnum);
 static void         polymer_drawwall(int16_t sectnum, int16_t wallnum);
 // HSR
 static void         polymer_computeplane(_prplane* p);
-static inline void  polymer_crossproduct(const GLfloat* in_a, const GLfloat* in_b, GLfloat* out);
 static inline void  polymer_transformpoint(const float* inpos, float* pos, const float* matrix);
-static inline void  polymer_normalize(float* vec);
 static inline void  polymer_pokesector(int16_t sectnum);
 static void         polymer_extractfrustum(GLfloat* modelview, GLfloat* projection, float* frustum);
 static inline int32_t polymer_planeinfrustum(_prplane const &plane, const float* frustum);
@@ -449,8 +447,6 @@ static inline void  polymer_culllight(int16_t lighti);
 static void         polymer_prepareshadows(void);
 // RENDER TARGETS
 static void         polymer_initrendertargets(int32_t count);
-// DEBUG OUTPUT
-void PR_CALLBACK    polymer_debugoutputcallback(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,GLvoid *userParam);
 
 #define INDICE(n) ((p->indices) ? (p->indices[(i+n)%(p->indicescount-1)]) : (((i+n)%(p->vertcount-1))))
 
