@@ -725,6 +725,7 @@ int32_t initsystem(void)
             initprintf("Using \"%s\" video driver\n", drvname);
 #endif
         wm_setapptitle(apptitle);
+        g_numdisplays = SDL_GetNumVideoDisplays();
     }
 
     return 0;
@@ -1304,11 +1305,13 @@ static int sortmodes(const void *a_, const void *b_)
 static char modeschecked=0;
 
 #if SDL_MAJOR_VERSION >= 2
-void videoGetModes(void)
+void videoGetModes(int display)
 {
     int32_t i, maxx = 0, maxy = 0;
     SDL_DisplayMode dispmode;
-    int const display = r_displayindex < SDL_GetNumVideoDisplays() ? r_displayindex : 0;
+
+    if (display < 0 || display >= g_numdisplays)
+        display = r_displayindex < SDL_GetNumVideoDisplays() ? r_displayindex : 0;
 
     if (modeschecked || novideo)
         return;
@@ -1424,6 +1427,11 @@ int32_t videoCheckMode(int32_t *x, int32_t *y, int32_t c, int32_t fs, int32_t fo
     *y = validmode[nearest].ydim;
 
     return nearest;
+}
+
+char const *videoGetDisplayName(int display)
+{
+    return SDL_GetDisplayName(display);
 }
 
 static void destroy_window_resources()
@@ -1555,10 +1563,14 @@ void setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int
 #endif
 
 #if SDL_MAJOR_VERSION >= 2
-    int const display = r_displayindex < SDL_GetNumVideoDisplays() ? r_displayindex : 0;
+    int const displayindex = SDL_GetWindowDisplayIndex(sdl_window);
+    int const newdisplayindex = r_displayindex < SDL_GetNumVideoDisplays() ? r_displayindex : displayindex;
+
+    if (displayindex != newdisplayindex)
+        windowx = windowy = -1;
 
     SDL_DisplayMode desktopmode;
-    SDL_GetDesktopDisplayMode(display, &desktopmode);
+    SDL_GetDesktopDisplayMode(newdisplayindex, &desktopmode);
 
     int const matchedResolution = (desktopmode.w == x && desktopmode.h == y);
     int const borderless = (r_borderless == 1 || (r_borderless == 2 && matchedResolution)) ? SDL_WINDOW_BORDERLESS : 0;
@@ -1572,7 +1584,7 @@ void setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int
         dispmode.refresh_rate = maxrefreshfreq;
 
         SDL_DisplayMode newmode;
-        SDL_GetClosestDisplayMode(display, &dispmode, &newmode);
+        SDL_GetClosestDisplayMode(newdisplayindex, &dispmode, &newmode);
         SDL_SetWindowDisplayMode(sdl_window, &newmode);
 #ifdef _WIN32
         if (timingInfo.rateRefresh.uiNumerator)
@@ -1587,9 +1599,9 @@ void setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int
     SDL_SetWindowSize(sdl_window, x, y);
     SDL_SetWindowFullscreen(sdl_window, ((fs & 1) ? (matchedResolution ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) : 0));
     SDL_SetWindowBordered(sdl_window, borderless ? SDL_FALSE : SDL_TRUE);
-    SDL_SetWindowPosition(sdl_window, (!fs && r_windowpositioning && windowx > 0) ? windowx : (int)SDL_WINDOWPOS_CENTERED_DISPLAY(display),
-                                      (!fs && r_windowpositioning && windowy > 0) ? windowy : (int)SDL_WINDOWPOS_CENTERED_DISPLAY(display));
     SDL_FlushEvent(SDL_WINDOWEVENT);
+    SDL_SetWindowPosition(sdl_window, (!fs && r_windowpositioning && windowx != -1) ? windowx : (int)SDL_WINDOWPOS_CENTERED_DISPLAY(newdisplayindex),
+                                      (!fs && r_windowpositioning && windowy != -1) ? windowy : (int)SDL_WINDOWPOS_CENTERED_DISPLAY(newdisplayindex));
 #endif
 
     videoFadePalette(palfadergb.r, palfadergb.g, palfadergb.b, palfadedelta);
