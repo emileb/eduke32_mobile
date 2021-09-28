@@ -2313,12 +2313,11 @@ int32_t try_facespr_intersect(uspriteptr_t const spr, vec3_t const in,
                               vec3_t * const intp, int32_t strictly_smaller_than_p)
 {
     vec3_t const sprpos = spr->xyz;
-
-    int32_t const topt = vx * (sprpos.x - in.x) + vy * (sprpos.y - in.y);
+    coord_t const topt = compat_maybe_truncate_to_int32(vx * (coord_t)(sprpos.x - in.x)) + compat_maybe_truncate_to_int32(vy * (coord_t)(sprpos.y - in.y));
 
     if (topt <= 0) return 0;
 
-    int32_t const bot = vx * vx + vy * vy;
+    coord_t const bot = uhypsq(vx, vy);
 
     if (!bot) return 0;
 
@@ -2329,9 +2328,9 @@ int32_t try_facespr_intersect(uspriteptr_t const spr, vec3_t const in,
     if (newpos.z < z1 - siz || newpos.z > z1)
         return 0;
 
-    int32_t const topu = vx * (sprpos.y - in.y) - vy * (sprpos.x - in.x);
+    coord_t const topu = compat_maybe_truncate_to_int32(vx * (coord_t)(sprpos.y - in.y)) - compat_maybe_truncate_to_int32(vy * (coord_t)(sprpos.x - in.x));
     vec2_t  const off  = { scale(vx, topu, bot), scale(vy, topu, bot) };
-    int32_t const dist = off.x * off.x + off.y * off.y;
+    coord_t const dist = uhypsq(off.x, off.y);
 
     siz = tilesiz[spr->picnum].x * spr->xrepeat;
 
