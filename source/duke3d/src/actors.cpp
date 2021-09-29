@@ -1013,10 +1013,11 @@ void G_AddGameLight(int spriteNum, int sectNum, vec3_t const &offset, int lightR
         pr_light.color[2] = curpalette[colidx].b;          
     }
 #else
+    auto unusedParameterWarningsOnConstReferencesSuck = offset;
+    UNREFERENCED_PARAMETER(unusedParameterWarningsOnConstReferencesSuck);
     UNREFERENCED_PARAMETER(lightRadius);
     UNREFERENCED_PARAMETER(spriteNum);
-    UNREFERENCED_PARAMETER(sectNum);
-    UNREFERENCED_CONST_PARAMETER(offset);
+    UNREFERENCED_PARAMETER(sectNum);    
     UNREFERENCED_PARAMETER(lightRange);
     UNREFERENCED_PARAMETER(lightHoriz);
     UNREFERENCED_PARAMETER(lightColor);
