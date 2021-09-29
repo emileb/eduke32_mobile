@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "colmatch.h"
 #include "duke3d.h"
 #include "microprofile.h"
+#include "screens.h"
 
 #if KRANDDEBUG
 # define ACTOR_STATIC
@@ -9279,7 +9280,6 @@ static void G_DoEventGame(int const nEventID)
 
 void G_MoveWorld(void)
 {
-    extern double g_moveActorsTime, g_moveWorldTime;
     double worldTime = timerGetFractionalTicks();
     auto framecnt = g_frameCounter;
 
@@ -9333,7 +9333,7 @@ void G_MoveWorld(void)
     actorsTime = timerGetFractionalTicks() - actorsTime;
 
     if (framecnt2 != framecnt)
-        actorsTime -= (double)g_lastFrameDuration * 1000.0 / (double)timerGetNanoTickRate();
+        actorsTime -= (double)g_lastFrameDuration2 * 1000.0 / (double)timerGetNanoTickRate();
 
     g_moveActorsTime = (1-0.033)*g_moveActorsTime + 0.033*actorsTime;
 
@@ -9369,7 +9369,7 @@ void G_MoveWorld(void)
     worldTime = timerGetFractionalTicks() - worldTime;
 
     if (g_frameCounter != framecnt)
-        worldTime -= (double)g_lastFrameDuration * 1000.0 / (double)timerGetNanoTickRate();
+        worldTime -= (double)g_lastFrameDuration2 * 1000.0 / (double)timerGetNanoTickRate();
 
     g_moveWorldTime = (1-0.033)*g_moveWorldTime + 0.033*worldTime;
 }
