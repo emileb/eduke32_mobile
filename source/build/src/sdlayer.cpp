@@ -1478,7 +1478,7 @@ void sdlayer_setvideomode_opengl(void)
 
 int32_t setvideomode_sdlcommon(int32_t *x, int32_t *y, int32_t c, int32_t fs, int32_t *regrab)
 {
-    if ((fs == fullscreen) && (*x == xres) && (*y == yres) && (c == bpp) && !videomodereset)
+    if ((r_displayindex == g_displayindex) && (fs == fullscreen) && (*x == xres) && (*y == yres) && (c == bpp) && !videomodereset)
         return 0;
 
     if (videoCheckMode(x, y, c, fs, 0) < 0)
@@ -1509,7 +1509,7 @@ int32_t setvideomode_sdlcommon(int32_t *x, int32_t *y, int32_t c, int32_t fs, in
     {
         if (bpp == 8)
             glsurface_destroy();
-        if ((fs == fullscreen) && (*x == xres) && (*y == yres) && (bpp != 0) && !videomodereset)
+        if ((r_displayindex == g_displayindex) && (fs == fullscreen) && (*x == xres) && (*y == yres) && (bpp != 0) && !videomodereset)
             return 0;
     }
     else
@@ -1608,6 +1608,8 @@ void setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int
 
     if (regrab)
         mouseGrabInput(g_mouseLockedToWindow);
+
+    g_displayindex = newdisplayindex;
 }
 
 #if SDL_MAJOR_VERSION >= 2

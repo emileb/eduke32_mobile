@@ -65,6 +65,7 @@ extern int32_t nofog;
 
 extern int32_t r_maxfps;
 extern int32_t g_numdisplays;
+extern int32_t g_displayindex;
 
 void calc_ylookup(int32_t bpl, int32_t lastyidx);
 

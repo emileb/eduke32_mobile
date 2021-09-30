@@ -32,6 +32,7 @@ extern "C"
 #endif // _WIN32
 
 int32_t g_numdisplays = 1;
+int32_t g_displayindex;
 
 // input
 char    inputdevices = 0;
