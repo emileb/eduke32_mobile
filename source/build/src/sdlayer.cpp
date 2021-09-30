@@ -2483,6 +2483,7 @@ int32_t handleevents_pollsdl(void)
 
                     case SDL_WINDOWEVENT_MOVED:
                     {
+                        if (fullscreen) break;
                         windowx = ev.window.data1;
                         windowy = ev.window.data2;
 
@@ -2492,6 +2493,7 @@ int32_t handleevents_pollsdl(void)
                         break;
                     }
                     case SDL_WINDOWEVENT_RESIZED:
+                        if (fullscreen) break;
                         sdl_resize = { ev.window.data1 & ~1, ev.window.data2 & ~1 };
                         break;
                     case SDL_WINDOWEVENT_ENTER:
