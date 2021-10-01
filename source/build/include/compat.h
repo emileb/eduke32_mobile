@@ -1272,9 +1272,9 @@ size_t Bgetsysmemsize(void);
 extern "C"
 {
 #endif
-extern const char *g_MemErrFunc;
-extern const char *g_MemErrFile;
-extern int32_t g_MemErrLine;
+extern thread_local const char *g_MemErrFunc;
+extern thread_local const char *g_MemErrFile;
+extern thread_local int32_t g_MemErrLine;
 #ifdef __cplusplus
 }
 #endif

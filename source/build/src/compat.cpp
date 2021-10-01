@@ -41,9 +41,9 @@ extern "C"
 {
 #endif
 #ifdef DEBUGGINGAIDS
-const char *g_MemErrFunc = "???";
-const char *g_MemErrFile = "???";
-int32_t g_MemErrLine;
+thread_local const char *g_MemErrFunc = "???";
+thread_local const char *g_MemErrFile = "???";
+thread_local int32_t g_MemErrLine;
 #endif
 char *_xstrdup(const char *s) { return xstrdup(s); }
 void *_xmalloc(bsize_t const size) { return xmalloc(size); }
