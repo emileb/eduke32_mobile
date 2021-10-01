@@ -176,7 +176,7 @@ void MV_PlayVoice(VoiceNode *voice)
     MV_Lock();
     LL::SortedInsert(&VoiceList, voice, &VoiceNode::priority);
     voice->PannedVolume = voice->GoalVolume;
-    voice->Paused = false;
+    voice->Paused.store(false, std::memory_order_release);
     MV_Unlock();
 }
 
@@ -282,7 +282,7 @@ static void MV_ServiceVoc(void)
         {
             next = voice->next;
 
-            if (voice->Paused)
+            if (voice->Paused.load(std::memory_order_acquire))
                 continue;
 
             if (voice->priority == FX_MUSIC_PRIORITY)
@@ -360,7 +360,7 @@ int MV_VoicePlaying(int handle)
 {
     Bassert(handle <= MV_MaxVoices);
     auto voice = MV_Handles[handle - MV_MINVOICEHANDLE];
-    return MV_Installed && voice != nullptr && voice->next != nullptr && !voice->Paused;
+    return MV_Installed && voice != nullptr && !voice->Paused.load(std::memory_order_relaxed);
 }
 
 int MV_KillAllVoices(void)
@@ -620,7 +620,7 @@ int MV_PauseVoice(int handle, int pause)
     if (voice == nullptr)
         return MV_Error;
 
-    voice->Paused = pause;
+    voice->Paused.store(pause, std::memory_order_release);
     MV_EndService();
 
     return MV_Ok;
