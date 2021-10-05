@@ -781,8 +781,7 @@ static void G_ShowCacheLocks(void)
         }
     }
 }
-
-#define LOW_FPS 60
+#define LOW_FPS (min<unsigned>((unsigned)(r_maxfps - 1), 59))
 #define SLOW_VM_TIME 5
 #define SLOW_FRAME_TIME (1000.0 / LOW_FPS - SLOW_VM_TIME)
 
