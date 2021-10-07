@@ -2,7 +2,7 @@
  * glsurface.cpp
  *  A 32-bit rendering surface that can quickly blit 8-bit paletted buffers implemented in OpenGL.
  *
- * Copyright © 2018, Alex Dawson. All rights reserved.
+ * Copyright Â© 2018, Alex Dawson. All rights reserved.
  */
 
 #include "glsurface.h"
@@ -104,7 +104,7 @@ bool glsurface_initialize(vec2_t bufferResolution)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, bufferRes.x, bufferRes.y, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bufferRes.x, bufferRes.y, 0, GL_ALPHA, GL_UNSIGNED_BYTE, 0);
 
     glsurface_setPalette(curpalettefaded);
 
@@ -137,7 +137,7 @@ bool glsurface_initialize(vec2_t bufferResolution)
          void main()\n\
          {\n\
              vec4 color = texture2D(s_texture, v_texCoord.xy);\n\
-             color.r = c_paletteOffset + c_paletteScale*color.r;\n\
+             color.r = c_paletteOffset + c_paletteScale*color.a;\n\
              color.rgb = texture2D(s_palette, color.rg).rgb;\n\
              \n\
              // DEBUG \n\
@@ -240,7 +240,7 @@ void glsurface_blitBuffer()
         return;
 
     buildgl_activeTexture(GL_TEXTURE0);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bufferRes.x, bufferRes.y, GL_RED, GL_UNSIGNED_BYTE, (void*) buffer);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bufferRes.x, bufferRes.y, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) buffer);
 
     glDrawArrays(GL_TRIANGLE_STRIP,
                  0,
