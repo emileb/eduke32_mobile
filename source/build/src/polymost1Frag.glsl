@@ -1,3 +1,4 @@
+R"(
 #version 110
 #extension GL_ARB_shader_texture_lod : enable
 
@@ -115,3 +116,4 @@ void main()
 
     gl_FragData[0] = color;
 }
+)"
