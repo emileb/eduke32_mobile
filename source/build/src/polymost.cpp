@@ -3364,13 +3364,21 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
                 drawpolyVerts[(off+i)*5+3] = (p.u * r - du0 + uoffs) * invtsiz2.x;
                 drawpolyVerts[(off+i)*5+4] = p.v * r * invtsiz2.y;
             }
+#ifdef USE_GLES2
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+            glVertexPointer(3, GL_FLOAT, 5 * sizeof(float), drawpolyVerts + off * 5 );
+            glTexCoordPointer(2, GL_FLOAT, 5 * sizeof(float),  drawpolyVerts  + (off *5) + 3);
+
+            glDrawArrays(GL_TRIANGLE_FAN, 0, npoints);
+#else
             if (!persistentStreamBuffer)
             {
                 glBufferSubData(GL_ARRAY_BUFFER, drawpolyVertsOffset*sizeof(float)*5, nn*sizeof(float)*5, drawpolyVerts);
             }
             glDrawArrays(GL_TRIANGLE_FAN, drawpolyVertsOffset, nn);
             drawpolyVertsOffset += nn;
+#endif
         }
     }
     else
@@ -3410,12 +3418,21 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
             drawpolyVerts[(off+i)*5+4] = vv[i] * r * scale.y;
         }
 
+#ifdef USE_GLES2
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        glVertexPointer(3, GL_FLOAT, 5 * sizeof(float), drawpolyVerts + off * 5 );
+        glTexCoordPointer(2, GL_FLOAT, 5 * sizeof(float),  drawpolyVerts  + (off *5) + 3);
+
+        glDrawArrays(GL_TRIANGLE_FAN, 0, npoints);
+#else
         if (!persistentStreamBuffer)
         {
             glBufferSubData(GL_ARRAY_BUFFER, drawpolyVertsOffset*sizeof(float)*5, npoints*sizeof(float)*5, drawpolyVerts);
         }
         glDrawArrays(GL_TRIANGLE_FAN, drawpolyVertsOffset, npoints);
         drawpolyVertsOffset += npoints;
+#endif
     }
 
 #ifdef USE_GLEXT
