@@ -233,6 +233,24 @@ void glsurface_blitBuffer()
     if (!buffer)
         return;
 
+#ifdef __ANDROID__
+
+    glUseProgram(shaderProgramID);
+	glDisable(GL_BLEND);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, paletteTexID);
+
+    glBindBuffer(GL_ARRAY_BUFFER, quadVertsID);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float) * 5, 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(float) * 5, (const void*) (sizeof(float) * 3));
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, bufferTexID);
+
+#endif
+
     glActiveTexture(GL_TEXTURE0);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bufferRes.x, bufferRes.y, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) buffer);
 

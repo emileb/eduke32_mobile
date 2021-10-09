@@ -4,21 +4,25 @@
 
 #ifdef USE_OPENGL
 
-#if !defined GEKKO && !defined EDUKE32_GLES
+#ifdef __ANDROID__
+#define USE_GLES2 1
+#endif
+
+#if !defined GEKKO
 # define DYNAMIC_GL
+
+#ifndef  USE_GLES2
 # define DYNAMIC_GLU
+#endif
+
 # define DYNAMIC_GLEXT
 # define USE_GLEXT
 #endif
 
-#if defined EDUKE32_OSX
-# include <OpenGL/glu.h>
-#else
+#ifndef USE_GLES2
 # include <GL/glu.h>
 #endif
-#if defined EDUKE32_GLES
-# include "jwzgles.h"
-#endif
+
 
 # ifdef _WIN32
 #  define PR_CALLBACK __stdcall

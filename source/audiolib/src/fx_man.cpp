@@ -85,7 +85,7 @@ static int osdcmd_cvar_set_audiolib(osdcmdptr_t parm)
     else if (ASS_MIDISoundDriver == ASS_WinMM && !Bstrcasecmp(parm->name, "mus_mme_device"))
         MIDI_Restart();
 #endif
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
     else if (ASS_MIDISoundDriver == ASS_ALSA && (!Bstrcasecmp(parm->name, "mus_alsa_clientid") || !Bstrcasecmp(parm->name, "mus_alsa_portid")))
         MIDI_Restart();
 #endif
@@ -120,7 +120,7 @@ void FX_InitCvars(void)
 {
     static osdcvardata_t cvars_audiolib [] ={
         { "mus_emidicard", "force a specific EMIDI instrument set", (void*) &ASS_EMIDICard, CVAR_INT | CVAR_FUNCPTR, -1, 10 },
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
         { "mus_alsa_clientid", "specify the ALSA MIDI client ID", (void*) &ALSA_ClientID, CVAR_INT | CVAR_FUNCPTR, 0, 255 },
         { "mus_alsa_portid", "specify the ALSA MIDI port ID", (void*) &ALSA_PortID, CVAR_INT | CVAR_FUNCPTR, 0, 15 },
 #endif

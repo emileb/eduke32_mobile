@@ -314,7 +314,6 @@ void fill_glinfo(void)
     glinfo.shadow   = !!Bstrstr(glinfo.extensions, "GL_ARB_shadow");
     glinfo.texnpot  = !!Bstrstr(glinfo.extensions, "GL_ARB_texture_non_power_of_two") || !!Bstrstr(glinfo.extensions, "GL_OES_texture_npot");
 
-#if !defined EDUKE32_GLES
     glinfo.bgra             = !!Bstrstr(glinfo.extensions, "GL_EXT_bgra");
     glinfo.bufferstorage    = !!Bstrstr(glinfo.extensions, "GL_ARB_buffer_storage");
     glinfo.clamptoedge      = !!Bstrstr(glinfo.extensions, "GL_EXT_texture_edge_clamp") || !!Bstrstr(glinfo.extensions, "GL_SGIS_texture_edge_clamp");
@@ -337,10 +336,6 @@ void fill_glinfo(void)
         glinfo.texcompr = 0;
     }
 # endif
-#else
-    // don't bother checking because ETC2 et al. are not listed in extensions anyway
-    glinfo.texcompr = 1; // !!Bstrstr(glinfo.extensions, "GL_OES_compressed_ETC1_RGB8_texture");
-#endif
 
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glinfo.maxanisotropy);
 
@@ -464,7 +459,6 @@ int osdcmd_glinfo(osdcmdptr_t UNUSED(parm))
     initprintf(" Framebuffer objects:     %s\n", SUPPORTED(glinfo.fbos));
     initprintf(" Multi-texturing:         %s\n", SUPPORTED(glinfo.multitex));
     initprintf(" Non-power-of-2 textures: %s\n", SUPPORTED(glinfo.texnpot));
-#ifndef EDUKE32_GLES
     initprintf(" Buffer storage:          %s\n", SUPPORTED(glinfo.bufferstorage));
     initprintf(" Debug output:            %s\n", SUPPORTED(glinfo.debugoutput));
     initprintf(" Depth textures:          %s\n", SUPPORTED(glinfo.depthtex));
@@ -475,7 +469,6 @@ int osdcmd_glinfo(osdcmdptr_t UNUSED(parm))
     initprintf(" Sync:                    %s\n", SUPPORTED(glinfo.sync));
     initprintf(" Texture compression:     %s\n", SUPPORTED(glinfo.texcompr));
     initprintf(" Vertex buffer objects:   %s\n", SUPPORTED(glinfo.vbos));
-#endif
     initprintf(" Maximum anisotropy:      %.1f%s\n", glinfo.maxanisotropy, glinfo.maxanisotropy > 1.0 ? "" : " (no anisotropic filtering)");
 
 #undef SUPPORTED

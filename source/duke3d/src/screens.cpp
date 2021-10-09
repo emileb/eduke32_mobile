@@ -20,10 +20,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 
-#ifdef __ANDROID__
-#include "android.h"
-#endif
-
 #include "anim.h"
 #include "colmatch.h"
 #include "compat.h"
@@ -805,6 +801,8 @@ static void G_PrintFPS(void)
     double frameDelay = frameTime - lastFrameTime;
     cumulativeFrameDelay += frameDelay;
 
+   ud.showfps = 1;
+
     if (frameDelay >= 0)
     {
         int32_t x = (xdim <= 640);
@@ -1098,7 +1096,7 @@ void G_DisplayRest(int32_t smoothratio)
             else
             {
 #ifdef __ANDROID__
-                CONTROL_Android_ScrollMap(&ud.fola, &ud.folx, &ud.foly, &pp->zoom);
+                //CONTROL_Android_ScrollMap(&ud.fola, &ud.folx, &ud.foly, &pp->zoom);
 #else
                 if (!ud.pause_on)
                 {

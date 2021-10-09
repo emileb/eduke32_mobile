@@ -16,9 +16,6 @@
 #include "osd.h"
 #include "pragmas.h"
 
-#ifdef __ANDROID__
-#include "android.h"
-#endif
 
 bool CONTROL_Started         = false;
 bool CONTROL_MouseEnabled    = false;
@@ -613,9 +610,6 @@ static void CONTROL_PollDevices(ControlInfo *info)
     memset(info, 0, sizeof(ControlInfo));
     handleevents();
 
-#ifdef __ANDROID__
-    CONTROL_Android_PollDevices(info);
-#endif
 
     if (CONTROL_MouseEnabled)
         CONTROL_GetMouseDelta(info);
@@ -737,9 +731,6 @@ void CONTROL_ClearButton(int whichbutton)
 {
     if (CONTROL_CheckRange(whichbutton)) return;
 
-#ifdef __ANDROID__
-    CONTROL_Android_ClearButton(whichbutton);
-#endif
 
     BUTTONCLEAR(whichbutton);
     CONTROL_Flags[whichbutton].cleared = TRUE;
@@ -833,9 +824,6 @@ static void CONTROL_GetFunctionInput(void)
 
 void CONTROL_GetInput(ControlInfo *info)
 {
-#ifdef __ANDROID__
-    CONTROL_Android_PollDevices(info);
-#endif
     CONTROL_PollDevices(info);
     CONTROL_GetFunctionInput();
     inputchecked = 1;

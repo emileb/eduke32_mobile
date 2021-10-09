@@ -575,14 +575,9 @@ typedef FILE BFILE;
 
 
 ////////// Standard library wrappers //////////
-
-#ifdef __ANDROID__
-# define BS_IWRITE S_IWUSR
-# define BS_IREAD  S_IRUSR
-#else
 # define BS_IWRITE S_IWRITE
 # define BS_IREAD  S_IREAD
-#endif
+
 
 #if defined(__cplusplus) && defined(_MSC_VER)
 # define Bstrdup _strdup
@@ -1518,10 +1513,6 @@ static inline void maybe_grow_buffer(char ** const buffer, int32_t * const buffe
 
 #define WITHKPLIB
 
-#if defined __ANDROID__ || defined EDUKE32_IOS
-# define EDUKE32_TOUCH_DEVICES
-# define EDUKE32_GLES
-#endif
 
 #if DEBUGGINGAIDS>=2
 # define DEBUG_MAIN_ARRAYS

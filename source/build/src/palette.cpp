@@ -48,6 +48,8 @@ static void paletteSetFade(uint8_t offset);
 #ifdef USE_OPENGL
 void fullscreen_tint_gl(uint8_t r, uint8_t g, uint8_t b, uint8_t f)
 {
+    return; // Crashes, FIX ME
+
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();

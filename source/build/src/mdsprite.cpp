@@ -971,7 +971,7 @@ int32_t mdloadskin(md2model_t *m, int32_t number, int32_t pal, int32_t surf)
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
 
-#if defined USE_GLEXT && !defined EDUKE32_GLES
+#if defined USE_GLEXT && !defined USE_GLES2
     if (!gotcache && glinfo.texcompr && glusetexcache && !(sk->flags & HICR_NOTEXCOMPRESS) &&
         (glusetexcompr == 2 || (glusetexcompr && !(sk->flags & HICR_ARTIMMUNITY))))
         {

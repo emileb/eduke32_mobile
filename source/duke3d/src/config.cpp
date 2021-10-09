@@ -183,19 +183,7 @@ void CONFIG_SetDefaults(void)
 {
     ud.config.scripthandle = -1;
 
-#ifdef __ANDROID__
-    droidinput.forward_sens = 5.f;
-    droidinput.gameControlsAlpha = 0.5;
-    droidinput.hideStick = 0;
-    droidinput.pitch_sens = 5.f;
-    droidinput.quickSelectWeapon = 1;
-    droidinput.strafe_sens = 5.f;
-    droidinput.toggleCrouch = 1;
-    droidinput.yaw_sens = 5.f;
 
-    ud.setup.xdim = droidinfo.screen_width;
-    ud.setup.ydim = droidinfo.screen_height;
-#else
 # if defined RENDERTYPESDL && SDL_MAJOR_VERSION >= 2
     uint32_t inited = SDL_WasInit(SDL_INIT_VIDEO);
     if (inited == 0)
@@ -215,7 +203,6 @@ void CONFIG_SetDefaults(void)
         ud.setup.xdim = 1024;
         ud.setup.ydim = 768;
     }
-#endif
 
 #ifdef USE_OPENGL
     ud.setup.bpp = 32;
@@ -223,10 +210,9 @@ void CONFIG_SetDefaults(void)
     ud.setup.bpp = 8;
 #endif
 
+
 #if defined(_WIN32)
     ud.config.MixRate = 44100;
-#elif defined __ANDROID__
-    ud.config.MixRate = droidinfo.audio_sample_rate;
 #else
     ud.config.MixRate = 48000;
 #endif
@@ -779,7 +765,9 @@ int CONFIG_ReadSetup(void)
     SCRIPT_GetNumber(ud.config.scripthandle, "Screen Setup", "WindowPositioning", (int32_t *)&windowpos);
 
     if (ud.setup.bpp < 8) ud.setup.bpp = 32;
-
+    //ud.setup.bpp = 32;
+    //ud.setup.xdim = 320;
+    //ud.setup.ydim = 240;
 #ifdef POLYMER
     int32_t rendmode = 0;
     SCRIPT_GetNumber(ud.config.scripthandle, "Screen Setup", "Polymer", &rendmode);
