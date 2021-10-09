@@ -572,13 +572,8 @@ typedef FILE BFILE;
 
 ////////// Standard library wrappers //////////
 
-#ifdef __ANDROID__
-# define BS_IWRITE S_IWUSR
-# define BS_IREAD  S_IRUSR
-#else
 # define BS_IWRITE S_IWRITE
 # define BS_IREAD  S_IREAD
-#endif
 
 #if defined(__cplusplus) && defined(_MSC_VER)
 # define Bstrdup _strdup

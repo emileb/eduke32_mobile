@@ -92,9 +92,7 @@ char modechange=1;
 char offscreenrendering=0;
 char videomodereset = 0;
 int32_t nofog=0;
-#ifndef EDUKE32_GLES
 static uint16_t sysgamma[3][256];
-#endif
 #ifdef USE_OPENGL
 // OpenGL stuff
 char nogl=0;
@@ -265,7 +263,7 @@ int32_t wm_ynbox(const char *name, const char *fmt, ...)
 
 void wm_setapptitle(const char *name)
 {
-#ifndef EDUKE32_TOUCH_DEVICES
+#ifndef __ANDROID__
     if (name != apptitle)
         Bstrncpyz(apptitle, name, sizeof(apptitle));
 
@@ -311,7 +309,7 @@ void wm_setapptitle(const char *name)
 //
 
 /* XXX: libexecinfo could be used on systems without gnu libc. */
-#if !defined _WIN32 && defined __GNUC__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__
+#if !defined _WIN32 && defined __GNUC__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__  && !defined __ANDROID__
 # define PRINTSTACKONSEGV 1
 # include <execinfo.h>
 #endif
@@ -1464,9 +1462,7 @@ void sdlayer_setvideomode_opengl(void)
 //    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
     glViewport(0,0,xres,yres);
 
-#ifndef EDUKE32_GLES
     glDisable(GL_DITHER);
-#endif
 
     fill_glinfo();
 }
@@ -1545,7 +1541,6 @@ void setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int
 #endif
 
     // save the current system gamma to determine if gamma is available
-#ifndef EDUKE32_GLES
     if (!gammabrightness)
     {
         //        float f = 1.0 + ((float)curbrightness / 10.0);
@@ -1560,7 +1555,6 @@ void setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int
         if (gammabrightness && videoSetGamma() < 0)
             gammabrightness = 0;  // nope
     }
-#endif
 
 #if SDL_MAJOR_VERSION >= 2
     int const displayindex = SDL_GetWindowDisplayIndex(sdl_window);
@@ -1623,6 +1617,29 @@ void setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int
 }
 
 #if SDL_MAJOR_VERSION >= 2
+
+#ifdef USE_GLES2
+#include <dlfcn.h>
+static void* PosixGetProcAddressMobile (const char * name)
+{
+  static void* h = NULL;
+  static void* gpa = NULL;
+
+  void * ret = 0;
+
+    if (h == NULL)
+    {
+        h = dlopen("libGL4ES.so", RTLD_LAZY | RTLD_LOCAL);
+        void (*initialize_gl4es)(void)  =   (void (*)(void))(dlsym(h, "initialize_gl4es"));
+        initialize_gl4es();
+    }
+
+    ret =  dlsym(h, (const char*)name);
+
+  return ret;
+}
+#endif
+
 int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
 {
     int32_t regrab = 0, ret;
@@ -1662,17 +1679,17 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
 
         if (nogl)
             return -1;
-
+#ifdef USE_GLES2
+       SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+       SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+	   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
         struct glattribs
         {
             SDL_GLattr attr;
             int32_t value;
         } sdlayer_gl_attributes[] =
         {
-#ifdef EDUKE32_GLES
-              { SDL_GL_CONTEXT_MAJOR_VERSION, 1 },
-              { SDL_GL_CONTEXT_MINOR_VERSION, 1 },
-#endif
               { SDL_GL_CONTEXT_FLAGS,
 #ifndef NDEBUG
               SDL_GL_CONTEXT_DEBUG_FLAG |
@@ -1686,7 +1703,7 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
           };
 
         SDL_GL_ATTRIBUTES(i, sdlayer_gl_attributes);
-
+#endif
         /* HACK: changing SDL GL attribs only works before surface creation,
             so we have to create a new surface in a different format first
             to force the surface we WANT to be recreated instead of reused. */
@@ -1705,8 +1722,11 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
             destroy_window_resources();
             return -1;
         }
-
+#ifdef USE_GLES2
+        gladLoadGLLoader(PosixGetProcAddressMobile);
+#else
         gladLoadGLLoader(SDL_GL_GetProcAddress);
+#endif
         if (GLVersion.major < 2)
         {
             initprintf("Your computer does not support OpenGL version 2 or greater. GL modes are unavailable.\n");
@@ -1877,7 +1897,7 @@ void videoShowFrame(int32_t w)
             if (palfadedelta)
                 fullscreen_tint_gl(palfadergb.r, palfadergb.g, palfadergb.b, palfadedelta);
 
-#ifdef __ANDROID__
+#ifdef __ANDROID__XX
             AndroidDrawControls();
 #endif
         }
@@ -1889,7 +1909,7 @@ void videoShowFrame(int32_t w)
         if ((r_glfinish == 1 && r_finishbeforeswap == 1) || vsync_renderlayer == 2)
         {
             MICROPROFILE_SCOPEI("Engine", "glFinish", MP_GREEN);
-            glFinish();
+            //glFinish();
         }
 
 #ifdef _WIN32
@@ -1920,7 +1940,7 @@ void videoShowFrame(int32_t w)
         if (r_glfinish == 1 && r_finishbeforeswap == 0 && vsync_renderlayer != 2)
         {
             MICROPROFILE_SCOPEI("Engine", "glFinish2", MP_GREEN4);
-            glFinish();
+            //glFinish();
         }
 
         MicroProfileFlip();
@@ -2037,7 +2057,6 @@ int32_t videoSetGamma(void)
         if (i != INT32_MIN)
             OSD_Printf("videoSetGamma(): %s\n", SDL_GetError());
 
-#ifndef EDUKE32_GLES
 #if SDL_MAJOR_VERSION >= 2
         if (sdl_window)
             SDL_SetWindowGammaRamp(sdl_window, &sysgamma[0][0], &sysgamma[1][0], &sysgamma[2][0]);
@@ -2045,7 +2064,6 @@ int32_t videoSetGamma(void)
         SDL_SetGammaRamp(&sysgamma[0][0], &sysgamma[1][0], &sysgamma[2][0]);
 #endif
         gammabrightness = 0;
-#endif
     }
     else
     {
@@ -2059,7 +2077,7 @@ int32_t videoSetGamma(void)
     return i;
 }
 
-#if !defined __APPLE__ && !defined EDUKE32_TOUCH_DEVICES
+#if !defined __APPLE__ && !defined EDUKE32_TOUCH_DEVICES && !defined __ANDROID__
 extern "C" struct sdlappicon sdlappicon;
 static inline SDL_Surface *loadappicon(void)
 {

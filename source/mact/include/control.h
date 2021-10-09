@@ -36,6 +36,7 @@ Modifications for JonoF's port by Jonathon Fowler (jf@jonof.id.au)
 #ifndef control_public_h_
 #define control_public_h_
 
+
 #include "joystick.h"
 #include "keyboard.h"
 #include "mouse.h"

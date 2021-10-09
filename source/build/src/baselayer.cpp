@@ -10,6 +10,10 @@
 #include "polymost.h"
 #include "renderlayer.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #define MINICORO_IMPL
 #define MCO_LOG initprintf
 #define MCO_ASSERT Bassert
@@ -492,11 +496,6 @@ void fill_glinfo(void)
         glinfo.texcompr = 0;
     }
 # endif
-
-#if defined EDUKE32_GLES
-    // don't bother checking because ETC2 et al. are not listed in extensions anyway
-    glinfo.texcompr = 1; // !!Bstrstr(glinfo.extensions, "GL_OES_compressed_ETC1_RGB8_texture");
-#endif
 
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glinfo.maxanisotropy);
 

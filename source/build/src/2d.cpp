@@ -56,7 +56,7 @@ static void drawpixel_safe(void *s, char a)
 //
 void plotpixel(int32_t x, int32_t y, char col)
 {
-#if defined USE_OPENGL && !defined EDUKE32_GLES
+#if defined USE_OPENGL
     if (videoGetRenderMode() >= REND_POLYMOST && in3dmode())
     {
         palette_t p = paletteGetColor(col);

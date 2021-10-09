@@ -5171,17 +5171,6 @@ FAKE_F3:
             ud.last_overhead = ud.overhead_on;
         }
 
-#ifdef __ANDROID__
-        if (ud.overhead_on == 1)
-            ud.scrollmode = 0;
-        else if (ud.overhead_on == 2)
-        {
-            ud.scrollmode = 1;
-            ud.folx = g_player[screenpeek].ps->opos.x;
-            ud.foly = g_player[screenpeek].ps->opos.y;
-            ud.fola = g_player[screenpeek].ps->oang;
-        }
-#endif
         g_restorePalette = 1;
         G_UpdateScreenArea();
     }
