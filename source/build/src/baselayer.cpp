@@ -139,22 +139,27 @@ static int osdfunc_bucketlist(osdcmdptr_t UNUSED(parm))
 static int osdfunc_heapinfo(osdcmdptr_t UNUSED(parm))
 {
     UNREFERENCED_CONST_PARAMETER(parm);
+#ifndef __ANDROID__
     mi_stats_print(NULL);
+#endif
     return OSDCMD_OK;
 }
 
 void engineDestroyAllocator(void)
 {
+#ifndef __ANDROID__
     _sm_allocator_thread_cache_destroy(g_sm_heap);
     _sm_allocator_destroy(g_sm_heap);
+#endif
 }
 
 void engineCreateAllocator(void)
 {
+#ifndef __ANDROID__
     // 8 buckets of 2MB each--we don't really need to burn a lot of memory here for this thing to do its job
     g_sm_heap = _sm_allocator_create(SMM_MAX_BUCKET_COUNT, 2097152);
     _sm_allocator_thread_cache_create(g_sm_heap, sm::CACHE_HOT, { 20480, 32768, 32768, 1536, 4096, 8192, 128, 4096 });
-
+#endif
 #ifdef SMMALLOC_STATS_SUPPORT
     OSD_RegisterFunction("bucketlist", "bucketlist: list bucket statistics", osdfunc_bucketlist);
 #endif

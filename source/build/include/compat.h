@@ -1300,6 +1300,9 @@ extern sm_allocator g_sm_heap;
 
 static FORCE_INLINE char *xstrdup(const char *s)
 {
+#ifdef __ANDROID__
+    return strdup(s);
+#endif
     int const len = Bstrlen(s)+1;
     char *ptr = (char *)_sm_malloc(g_sm_heap, len, ALLOC_ALIGNMENT);
     if (EDUKE32_PREDICT_TRUE(ptr != nullptr))
@@ -1314,6 +1317,9 @@ static FORCE_INLINE char *xstrdup(const char *s)
 
 static FORCE_INLINE void *xmalloc(bsize_t const size)
 {
+#ifdef __ANDROID__
+	return malloc(size);
+#endif
     void *ptr = _sm_malloc(g_sm_heap, size, ALLOC_ALIGNMENT);
     if (EDUKE32_PREDICT_TRUE(ptr != nullptr)) return ptr;
     handle_memerr();
@@ -1322,6 +1328,9 @@ static FORCE_INLINE void *xmalloc(bsize_t const size)
 
 static FORCE_INLINE void *xcalloc(bsize_t const nmemb, bsize_t const size)
 {
+#ifdef __ANDROID__
+	return calloc(nmemb, size);
+#endif
     bsize_t const siz = nmemb * size;
     void *ptr = _sm_malloc(g_sm_heap, siz, ALLOC_ALIGNMENT);
     if (EDUKE32_PREDICT_TRUE(ptr != nullptr))
@@ -1335,6 +1344,9 @@ static FORCE_INLINE void *xcalloc(bsize_t const nmemb, bsize_t const size)
 
 static FORCE_INLINE void *xrealloc(void * const ptr, bsize_t const size)
 {
+#ifdef __ANDROID__	
+	return realloc(ptr, size);
+#endif
     void *newptr = _sm_realloc(g_sm_heap, ptr, size, ALLOC_ALIGNMENT);
 
     // According to the C Standard,
@@ -1350,6 +1362,9 @@ static FORCE_INLINE void *xrealloc(void * const ptr, bsize_t const size)
 
 static FORCE_INLINE void *xaligned_alloc(bsize_t const alignment, bsize_t const size)
 {
+#ifdef __ANDROID__	
+	return malloc(size);
+#endif
     void *ptr = _sm_malloc(g_sm_heap, size, alignment);
     if (EDUKE32_PREDICT_TRUE(ptr != nullptr)) return ptr;
     handle_memerr();
@@ -1358,6 +1373,9 @@ static FORCE_INLINE void *xaligned_alloc(bsize_t const alignment, bsize_t const 
 
 static FORCE_INLINE void *xaligned_calloc(bsize_t const alignment, bsize_t const count, bsize_t const size)
 {
+#ifdef __ANDROID__	
+	return calloc(count, size);
+#endif
     bsize_t const blocksize = count * size;
     void *ptr = _sm_malloc(g_sm_heap, blocksize, alignment);
     if (EDUKE32_PREDICT_TRUE(ptr != nullptr))
@@ -1369,8 +1387,21 @@ static FORCE_INLINE void *xaligned_calloc(bsize_t const alignment, bsize_t const
     EDUKE32_UNREACHABLE_SECTION(return nullptr);
 }
 
-static FORCE_INLINE void xfree(void *const ptr) { _sm_free(g_sm_heap, ptr); }
-static FORCE_INLINE void xaligned_free(void *const ptr) { _sm_free(g_sm_heap, ptr); }
+static FORCE_INLINE void xfree(void *const ptr)
+{
+#ifdef __ANDROID__
+	return free(ptr);
+#endif
+	_sm_free(g_sm_heap, ptr);
+}
+
+static FORCE_INLINE void xaligned_free(void *const ptr)
+{
+#ifdef __ANDROID__	
+	return free(ptr);
+#endif
+	_sm_free(g_sm_heap, ptr);
+}
 #endif
 
 // jump through hoops so stuff with C linkage works
@@ -1453,10 +1484,6 @@ static inline void maybe_grow_buffer(char ** const buffer, int32_t * const buffe
 
 #define WITHKPLIB
 
-#if defined __ANDROID__ || defined EDUKE32_IOS
-# define EDUKE32_TOUCH_DEVICES
-# define EDUKE32_GLES
-#endif
 
 #if DEBUGGINGAIDS>=2
 # define DEBUG_MAIN_ARRAYS

@@ -68,13 +68,18 @@ engine_objs := \
     build/src/timer.cpp \
     build/src/vfs.cpp \
     build/src/xxhash.c \
-    build/src/zpl.cpp \
     build/src/glsurface.cpp \
+    build/src/glbuild.cpp \
     build/src/voxmodel.cpp \
     build/src/mdsprite.cpp \
     build/src/tilepacker.cpp \
     build/src/a-c.cpp \
-    build/src/sdlayer.cpp
+    build/src/sdlayer.cpp \
+
+
+    #build/src/smmalloc.cpp \
+    #build/src/smmalloc_tls.cpp \
+    #build/src/smmalloc_generic.cpp
 
 
 glad_objs := \
@@ -126,7 +131,6 @@ duke3d_game_objs := \
     duke3d/src/grpscan.cpp \
     duke3d/src/input.cpp \
     duke3d/src/menus.cpp \
-    duke3d/src/namesdyn.cpp \
     duke3d/src/network.cpp \
     duke3d/src/osdcmds.cpp \
     duke3d/src/osdfuncs.cpp \
@@ -138,8 +142,26 @@ duke3d_game_objs := \
     duke3d/src/screens.cpp \
     duke3d/src/sector.cpp \
     duke3d/src/sounds.cpp \
-    duke3d/src/soundsdyn.cpp \
     duke3d/src/text.cpp \
+    duke3d/src/dnames.cpp \
+
+
+mimalloc_objs := \
+    mimalloc/src/alloc.c \
+    mimalloc/src/alloc-aligned.c \
+    mimalloc/src/alloc-posix.c \
+    mimalloc/src/arena.c \
+    mimalloc/src/bitmap.c \
+    mimalloc/src/heap.c \
+    mimalloc/src/init.c \
+    mimalloc/src/options.c \
+    mimalloc/src/os.c \
+    mimalloc/src/page.c \
+    mimalloc/src/random.c \
+    mimalloc/src/region.c \
+    mimalloc/src/segment.c \
+    mimalloc/src/stats.c \
+
 
 ANDROID_SRC_FILES = \
      android/game_interface.cpp \
@@ -147,7 +169,7 @@ ANDROID_SRC_FILES = \
      ../../Clibs_OpenTouch/touch_interface_base.cpp \
      ../../Clibs_OpenTouch/android_jni_inc.cpp \
 
-LOCAL_SRC_FILES =  $(ANDROID_SRC_FILES) $(engine_objs) $(glad_objs) $(mact_objs) $(audiolib_objs) $(duke3d_common_editor_objs) $(duke3d_game_objs)
+LOCAL_SRC_FILES =  $(ANDROID_SRC_FILES) $(engine_objs) $(glad_objs) $(mact_objs) $(audiolib_objs) $(duke3d_common_editor_objs) $(duke3d_game_objs)#$(mimalloc_objs)
 
 LOCAL_LDLIBS :=  -llog -lOpenSLES
 
