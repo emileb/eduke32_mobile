@@ -1668,11 +1668,11 @@ void uploadtextureindexed(int32_t doalloc, vec2_t offset, vec2_t siz, intptr_t t
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, siz.y, siz.x, 0, GL_RED, GL_UNSIGNED_BYTE, (void*) tile);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, siz.y, siz.x, 0, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) tile);
     }
     else
     {
-        glTexSubImage2D(GL_TEXTURE_2D, 0, offset.x, offset.y, siz.y, siz.x, GL_RED, GL_UNSIGNED_BYTE, (void*) tile);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, offset.x, offset.y, siz.y, siz.x, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) tile);
     }
 }
 
@@ -1750,7 +1750,7 @@ void uploadpalswap(int32_t palookupnum)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_mode);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp_mode);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, PALSWAP_TEXTURE_SIZE, PALSWAP_TEXTURE_SIZE, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, PALSWAP_TEXTURE_SIZE, PALSWAP_TEXTURE_SIZE, 0, GL_ALPHA, GL_UNSIGNED_BYTE, NULL);
     }
 
     int32_t column = palookupnum%(PALSWAP_TEXTURE_SIZE/256);
@@ -1764,8 +1764,8 @@ void uploadpalswap(int32_t palookupnum)
     //POGO: There was a reason why having an extra row of black pixels was necessary along the edge of the palswap (I believe it affected a particular IHV/GPU).
     //      It may be worth investigating what this reason was again, but for now, make sure we properly initialize this row.
     static char blackPixels256[256] = {0};
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset+numshades, 256, 1, GL_RED, GL_UNSIGNED_BYTE, blackPixels256);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset, 256, numshades, GL_RED, GL_UNSIGNED_BYTE, palookup[palookupnum]);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset+numshades, 256, 1, GL_ALPHA, GL_UNSIGNED_BYTE, blackPixels256);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset, 256, numshades, GL_ALPHA, GL_UNSIGNED_BYTE, palookup[palookupnum]);
 }
 
 
