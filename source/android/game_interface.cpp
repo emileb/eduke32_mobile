@@ -18,6 +18,8 @@
 
 #include "SDL_beloko_extra.h"
 
+#include "player.h"
+
 extern "C"
 {
 	extern int SDL_SendKeyboardKey(Uint8 state, SDL_Scancode scancode);
@@ -53,6 +55,7 @@ int PortableKeyEvent(int state, int code, int unicode)
 void PortableBackButton()
 {
 	PortableKeyEvent(1, SDL_SCANCODE_ESCAPE, 0);
+	usleep(1000*100);
 	PortableKeyEvent(0, SDL_SCANCODE_ESCAPE, 0);
 }
 
@@ -382,10 +385,13 @@ void PortableInit(int argc, const char ** argv)
 }
 
 bool            g_bindingbutton = false;
-
+extern playerdata_t     *const g_player;
 touchscreemode_t PortableGetScreenMode()
 {
-	return TS_MENU;
+	if(g_player[0].ps->gm & MODE_MENU)
+		return TS_MENU;
+	else
+		return TS_GAME;
 }
 
 

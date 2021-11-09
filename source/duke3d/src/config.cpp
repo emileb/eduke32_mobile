@@ -661,7 +661,11 @@ void CONFIG_SetGameControllerDefaultsClear()
         CONFIG_SetJoystickAnalogAxisFunction(i, -1);
     }
 }
-
+#ifdef __ANDROID__
+extern int g_screenWidthCmd;
+extern int g_screenHeightCmd;
+extern int g_screenBppCmd;
+#endif
 int CONFIG_ReadSetup(void)
 {
     char tempbuf[1024];
@@ -765,9 +769,18 @@ int CONFIG_ReadSetup(void)
     SCRIPT_GetNumber(ud.config.scripthandle, "Screen Setup", "WindowPositioning", (int32_t *)&windowpos);
 
     if (ud.setup.bpp < 8) ud.setup.bpp = 32;
-    //ud.setup.bpp = 32;
-    //ud.setup.xdim = 320;
-    //ud.setup.ydim = 240;
+
+#ifdef __ANDROID__
+    if(g_screenWidthCmd)
+        ud.setup.xdim = g_screenWidthCmd;
+
+    if(g_screenHeightCmd)
+        ud.setup.ydim = g_screenHeightCmd;
+
+    if(g_screenBppCmd)
+        ud.setup.bpp = g_screenBppCmd;
+#endif
+
 #ifdef POLYMER
     int32_t rendmode = 0;
     SCRIPT_GetNumber(ud.config.scripthandle, "Screen Setup", "Polymer", &rendmode);

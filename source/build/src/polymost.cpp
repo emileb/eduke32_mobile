@@ -595,10 +595,14 @@ void polymost_resetVertexPointers()
 {
     polymost_outputGLDebugMessage(3, "polymost_resetVertexPointers()");
 
+#ifdef USE_GLES2
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+#else
     glBindBuffer(GL_ARRAY_BUFFER, drawpolyVertsID);
 
     glVertexPointer(3, GL_FLOAT, 5*sizeof(float), 0);
     glTexCoordPointer(2, GL_FLOAT, 5*sizeof(float), (GLvoid*) (3*sizeof(float)));
+#endif
 
 #ifdef USE_GLEXT
     if (r_detailmapping)

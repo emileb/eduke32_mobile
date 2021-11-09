@@ -19,6 +19,7 @@ $(TOP_DIR)/MobileTouchControls  \
 LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DENGINE_NAME=\"eduke32\"
 LOCAL_CPPFLAGS := -fexceptions
 
+
 engine_objs := \
     build/src/2d.cpp \
     build/src/baselayer.cpp \

@@ -1374,6 +1374,13 @@ static int sortmodes(const void *a_, const void *b_)
 static char modeschecked=0;
 
 #if SDL_MAJOR_VERSION >= 2
+
+#ifdef __ANDROID__
+extern int g_screenWidthCmd;
+extern int g_screenHeightCmd;
+extern int g_screenBppCmd;
+#endif
+
 void videoGetModes(void)
 {
     int32_t i, maxx = 0, maxy = 0;
@@ -1407,6 +1414,10 @@ void videoGetModes(void)
             maxy = dispmode.h;
         }
     }
+
+#ifdef __ANDROID__
+    SDL_ADDMODE(g_screenWidthCmd, g_screenHeightCmd, g_screenBppCmd, 1);
+#endif
 
     SDL_CHECKFSMODES(maxx, maxy);
 
