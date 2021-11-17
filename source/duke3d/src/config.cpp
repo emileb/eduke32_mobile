@@ -779,6 +779,8 @@ int CONFIG_ReadSetup(void)
 
     if(g_screenBppCmd)
         ud.setup.bpp = g_screenBppCmd;
+
+    ud.screenfade = 0;
 #endif
 
 #ifdef POLYMER
