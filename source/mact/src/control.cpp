@@ -683,10 +683,19 @@ static void controlUpdateGameFunctions(void)
     memset(CONTROL_ButtonFlags, 0, sizeof(CONTROL_ButtonFlags));
 }
 
+#ifdef __ANDROID__
+void Mobile_IN_Move(ControlInfo *info);
+#endif
+
 void CONTROL_GetInput(ControlInfo *info)
 {
     controlPollDevices(info);
     controlUpdateGameFunctions();
+
+#ifdef __ANDROID__
+    Mobile_IN_Move(info);
+#endif
+
     inputchecked = 1;
 }
 

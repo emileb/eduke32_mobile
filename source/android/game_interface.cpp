@@ -20,6 +20,11 @@
 
 #include "player.h"
 
+#include "keyboard.h"
+#include "control.h"
+#include "_control.h"
+#include "function.h"
+
 extern "C"
 {
 	extern int SDL_SendKeyboardKey(Uint8 state, SDL_Scancode scancode);
@@ -100,6 +105,26 @@ void PortableMouseButton(int state, int button, float dx, float dy)
 		SDL_InjectMouse(0, ACTION_UP, 0, 0, SDL_TRUE);
 }
 
+static uint64_t functionSticky = 0;
+static uint64_t functionHeld = 0;
+
+void changeActionState(int state, int action)
+{
+	if (state)
+	{
+		functionSticky  |= ((uint64_t)1<<((uint64_t)(action)));
+		functionHeld    |= ((uint64_t)1<<((uint64_t)(action)));
+		return;
+	}
+
+	functionHeld  &= ~((uint64_t) 1<<((uint64_t) (action)));
+}
+
+bool buttonDown(int action)
+{
+	return false; // TODO
+}
+
 void PortableAction(int state, int action)
 {
 	LOGI("PortableAction %d   %d", state, action);
@@ -124,98 +149,94 @@ void PortableAction(int state, int action)
 		}
 		else if(action == PORT_ACT_USE)   // This is sent from the blank screen
 		{
-//			buttonChange(state, Button_Use);
+//			changeActionState(state, Button_Use);
 		}
 	}
 	else
 	{
 		switch(action)
 		{
-			/*
 		case PORT_ACT_LEFT:
-			buttonChange(state, gamefunc_Turn_Left);
+			changeActionState(state, gamefunc_Turn_Left);
 			break;
 
 		case PORT_ACT_RIGHT:
-			buttonChange(state, gamefunc_Turn_Right);
+			changeActionState(state, gamefunc_Turn_Right);
 			break;
 
 		case PORT_ACT_FWD:
-			buttonChange(state, gamefunc_Move_Forward);
+			changeActionState(state, gamefunc_Move_Forward);
 			break;
 
 		case PORT_ACT_BACK:
-			buttonChange(state, gamefunc_Move_Backward);
+			changeActionState(state, gamefunc_Move_Backward);
 			break;
 
 		case PORT_ACT_MOVE_LEFT:
-			buttonChange(state, gamefunc_Strafe_Left);
+			changeActionState(state, gamefunc_Strafe_Left);
 			break;
 
 		case PORT_ACT_MOVE_RIGHT:
-			buttonChange(state, gamefunc_Strafe_Right);
+			changeActionState(state, gamefunc_Strafe_Right);
 			break;
 
 		case PORT_ACT_FLY_UP:
-			//buttonChange(state, Button_MoveUp);
+			//changeActionState(state, Button_MoveUp);
 			break;
 
 		case PORT_ACT_FLY_DOWN:
-			//buttonChange(state, Button_MoveDown);
+			//changeActionState(state, Button_MoveDown);
 			break;
 
 		case PORT_ACT_USE:
-			buttonChange(state, gamefunc_Open);
+			changeActionState(state, gamefunc_Open);
 			break;
 
 		case PORT_ACT_ATTACK:
-			buttonChange(state, gamefunc_Fire);
+			changeActionState(state, gamefunc_Fire);
 			break;
 
 		case PORT_ACT_ALT_ATTACK:
-			buttonChange(state, gamefunc_Alt_Fire);
+			changeActionState(state, gamefunc_Alt_Fire);
 			break;
 
 		case PORT_ACT_TOGGLE_ALT_ATTACK:
 			if(state)
 			{
 				if(buttonDown(gamefunc_Alt_Fire))
-					buttonChange(0, gamefunc_Alt_Fire);
+					changeActionState(0, gamefunc_Alt_Fire);
 				else
-					buttonChange(1, gamefunc_Alt_Fire);
+					changeActionState(1, gamefunc_Alt_Fire);
 			}
 
 			break;
 
 		case PORT_ACT_JUMP:
-			buttonChange(state, gamefunc_Jump);
+			changeActionState(state, gamefunc_Jump);
 			break;
 
 		case PORT_ACT_DOWN:
-			buttonChange(state, gamefunc_Crouch);
+			changeActionState(state, gamefunc_Crouch);
 			break;
 
 		case PORT_ACT_TOGGLE_CROUCH:
 		{
 			static SmartToggle_t smartToggle;
 			int activate = SmartToggleAction(&smartToggle, state, buttonDown(gamefunc_Crouch));
-			buttonChange(activate, gamefunc_Crouch);
+			changeActionState(activate, gamefunc_Crouch);
 		}
 		break;
 
 		case PORT_ACT_NEXT_WEP:
-			if(state)
-				PortableCommand("weapnext");
+			changeActionState(state, gamefunc_Next_Weapon);
 			break;
 
 		case PORT_ACT_PREV_WEP:
-			if(state)
-				PortableCommand("weapprev");
+			changeActionState(state, gamefunc_Previous_Weapon);
 			break;
 
 		case PORT_ACT_MAP:
-			if(state)
-				PortableCommand("togglemap");
+			changeActionState(state, gamefunc_Map);
 			break;
 
 		case PORT_ACT_QUICKLOAD:
@@ -229,53 +250,43 @@ void PortableAction(int state, int action)
 			break;
 
 		case PORT_ACT_WEAP0:
-			if(state)
-				PortableCommand("slot 10");
+			changeActionState(state, gamefunc_Weapon_10);
 			break;
 
 		case PORT_ACT_WEAP1:
-			if(state)
-				PortableCommand("slot 1");
+			changeActionState(state, gamefunc_Weapon_1);
 			break;
 
 		case PORT_ACT_WEAP2:
-			if(state)
-				PortableCommand("slot 2");
+			changeActionState(state, gamefunc_Weapon_2);
 			break;
 
 		case PORT_ACT_WEAP3:
-			if(state)
-				PortableCommand("slot 3");
+			changeActionState(state, gamefunc_Weapon_3);
 			break;
 
 		case PORT_ACT_WEAP4:
-			if(state)
-				PortableCommand("slot 4");
+			changeActionState(state, gamefunc_Weapon_4);
 			break;
 
 		case PORT_ACT_WEAP5:
-			if(state)
-				PortableCommand("slot 5");
+			changeActionState(state, gamefunc_Weapon_5);
 			break;
 
 		case PORT_ACT_WEAP6:
-			if(state)
-				PortableCommand("slot 6");
+			changeActionState(state, gamefunc_Weapon_6);
 			break;
 
 		case PORT_ACT_WEAP7:
-			if(state)
-				PortableCommand("slot 7");
+			changeActionState(state, gamefunc_Weapon_7);
 			break;
 
 		case PORT_ACT_WEAP8:
-			if(state)
-				PortableCommand("slot 8");
+			changeActionState(state, gamefunc_Weapon_8);
 			break;
 
 		case PORT_ACT_WEAP9:
-			if(state)
-				PortableCommand("slot 9");
+			changeActionState(state, gamefunc_Weapon_9);
 			break;
 
 		case PORT_ACT_CONSOLE:
@@ -284,30 +295,24 @@ void PortableAction(int state, int action)
 			break;
 
 		case PORT_ACT_INVUSE:
-			if(state)
-				PortableCommand("invuse");
+			changeActionState(state, gamefunc_Inventory);
 			break;
 
 		case PORT_ACT_INVDROP:
-			if(state)
-				PortableCommand("invdrop");
+			changeActionState(state, gamefunc_Inventory);
 			break;
 
 		case PORT_ACT_INVPREV:
-			if(state)
-				PortableCommand("invprev");
+			changeActionState(state, gamefunc_Inventory_Left);
 			break;
 
 		case PORT_ACT_INVNEXT:
-			if(state)
-				PortableCommand("invnext");
+			changeActionState(state, gamefunc_Inventory_Right);
 			break;
 
 		case PORT_ACT_WEAP_ALT:
-			if(state)
-				PortableCommand("weapalt");
+			changeActionState(state, gamefunc_Alt_Weapon);
 			break;
-			 */
 		}
 	}
 }
@@ -431,37 +436,55 @@ void Mobile_AM_controls(double *zoom, double *pan_x, double *pan_y)
 //void AddCommandString (char *cmd, int keynum=0);
 
 extern "C" int blockGamepad(void);
-/*
-void Mobile_IN_Move(ControlInfo &input)
+
+#define ANDROIDMOVEFACTOR           64000
+#define ANDROIDLOOKFACTOR          1600000
+
+#define ANDROIDPITCHFACTORJOYSTICK          2000
+#define ANDROIDYAWFACTORJOYSTICK            4000
+
+void Mobile_IN_Move(ControlInfo *input)
 {
 	int blockMove = blockGamepad() & ANALOGUE_AXIS_FWD;
 	int blockLook = blockGamepad() & ANALOGUE_AXIS_PITCH;
 
 	if(!blockMove)
 	{
-		input.dz += forwardmove_android ;
-		input.dx -= sidemove_android;
+		input->dz -= forwardmove_android * ANDROIDMOVEFACTOR;
+		input->dx += sidemove_android * ANDROIDMOVEFACTOR;
 	}
 
 	if(!blockLook)
 	{
 		// Add pitch
-		input.dpitch += -look_pitch_mouse * 35;
+		input->dpitch += -look_pitch_mouse * 1000000;
 		look_pitch_mouse = 0;
-		input.dpitch += look_pitch_joy * 1;
+		input->dpitch += look_pitch_joy * 1;
 
 		// Add yaw
-		input.dyaw += -look_yaw_mouse * 100;
+		input->dyaw += -look_yaw_mouse * 3000000;
 		look_yaw_mouse = 0;
-		input.dyaw += -look_yaw_joy * 1;
+		input->dyaw += -look_yaw_joy * 1;
 	}
 
 	if(cmd_to_run)
 	{
-		AddCommandString((char*)cmd_to_run);
+		//AddCommandString((char*)cmd_to_run);
 		cmd_to_run = NULL;
 	}
+
+	for(int n = 0;n < 64; n++)
+	{
+		if(functionHeld & ((uint64_t)1<<((uint64_t)(n))))
+			CONTROL_ButtonFlags[n] = 1;
+		else
+			CONTROL_ButtonFlags[n] = 0;
+	}
+	//CONTROL_ButtonState = functionSticky | functionHeld;
+	functionSticky = 0;
+
+	//LOGI("CONTROL_ButtonState = %d", CONTROL_ButtonState);
 }
-*/
+
 
 
