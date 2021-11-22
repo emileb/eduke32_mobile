@@ -822,9 +822,18 @@ static void CONTROL_GetFunctionInput(void)
     memset(CONTROL_ButtonFlags, 0, sizeof(CONTROL_ButtonFlags));
 }
 
+#ifdef __ANDROID__
+void Mobile_IN_Move(ControlInfo *info);
+#endif
+
 void CONTROL_GetInput(ControlInfo *info)
 {
     CONTROL_PollDevices(info);
+
+#ifdef __ANDROID__
+    Mobile_IN_Move(info);
+#endif
+
     CONTROL_GetFunctionInput();
     inputchecked = 1;
 }
