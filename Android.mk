@@ -10,13 +10,15 @@ $(LOCAL_PATH)/build/include \
 $(LOCAL_PATH)/audiolib/include \
 $(LOCAL_PATH)/mact/include \
 $(LOCAL_PATH)/duke3d/src \
+$(LOCAL_PATH)/libxmp-lite/include \
 $(SDL_INCLUDE_PATHS) \
 $(TOP_DIR)/Clibs_OpenTouch \
 $(TOP_DIR)/Clibs_OpenTouch\raze \
 $(TOP_DIR)/MobileTouchControls  \
+$(TOP_DIR)/AudioLibs_OpenTouch/liboggvorbis/include  \
 
 
-LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DENGINE_NAME=\"eduke32\"
+LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DHAVE_XMP -DHAVE_VORBIS -DHAVE_FLAC -DENGINE_NAME=\"eduke32\"
 LOCAL_CPPFLAGS := -fexceptions
 
 
@@ -151,7 +153,7 @@ LOCAL_SRC_FILES =  $(ANDROID_SRC_FILES) $(engine_objs) $(glad_objs) $(mact_objs)
 
 LOCAL_LDLIBS :=  -llog -lOpenSLES
 
-LOCAL_STATIC_LIBRARIES := logwritter
+LOCAL_STATIC_LIBRARIES := logwritter flac xmp
 LOCAL_SHARED_LIBRARIES := touchcontrols openal SDL2 SDL2_mixer SDL2_image
 
 
