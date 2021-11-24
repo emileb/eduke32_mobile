@@ -24,6 +24,7 @@
 #include "control.h"
 #include "_control.h"
 #include "function.h"
+#include "anim.h"
 
 extern "C"
 {
@@ -391,12 +392,26 @@ void PortableInit(int argc, const char ** argv)
 
 bool            g_bindingbutton = false;
 extern playerdata_t     *const g_player;
+extern int inExtraScreens; //In screens.c
+extern int myconnectindex;
 touchscreemode_t PortableGetScreenMode()
 {
-	if(g_player[0].ps->gm & MODE_MENU)
+	if(g_bindingbutton) {
+		g_bindingbutton = false;
+		return TS_CUSTOM;
+	}
+	else if (g_animPtr || inExtraScreens)
+		return TS_BLANK;
+	else if(g_player[myconnectindex].ps->gm & MODE_MENU)
 		return TS_MENU;
+	else if ((g_player[myconnectindex].ps->gm & MODE_GAME)) {
+		if (g_player[myconnectindex].ps->dead_flag)
+			return TS_GAME;
+		else
+			return TS_GAME;
+	}
 	else
-		return TS_GAME;
+		return TS_BLANK;
 }
 
 
@@ -457,19 +472,19 @@ void Mobile_IN_Move(ControlInfo *input)
 	if(!blockLook)
 	{
 		// Add pitch
-		input->dpitch += -look_pitch_mouse * 1000000;
+		input->mousey += -look_pitch_mouse * 50000;
 		look_pitch_mouse = 0;
-		input->dpitch += look_pitch_joy * 1;
+		input->dpitch += look_pitch_joy * 30000;
 
 		// Add yaw
-		input->dyaw += -look_yaw_mouse * 3000000;
+		input->mousex += -look_yaw_mouse * 100000;
 		look_yaw_mouse = 0;
-		input->dyaw += -look_yaw_joy * 1;
+		input->dyaw += -look_yaw_joy * 20000;
 	}
 
 	if(cmd_to_run)
 	{
-		//AddCommandString((char*)cmd_to_run);
+		OSD_Dispatch(cmd_to_run);
 		cmd_to_run = NULL;
 	}
 
