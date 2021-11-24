@@ -2264,7 +2264,7 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
         float al = 0.0;
         if (alphahackarray[globalpicnum] != 0)
             al=alphahackarray[globalpicnum] * (1.f/255.f);
-        buildgl_setDisabled(GL_BLEND);
+        buildgl_setEnabled(GL_BLEND);
         // buildgl_setEnabled(GL_ALPHA_TEST);
         buildgl_setAlphaFunc(GL_GREATER,al);
     }
@@ -2581,7 +2581,7 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
 
     // if (m->usesalpha) glDisable(GL_ALPHA_TEST);
 
-    buildgl_setEnabled(GL_CULL_FACE);
+    buildgl_setDisabled(GL_CULL_FACE);
 //    glPopAttrib();
 
     glMatrixMode(GL_TEXTURE);
