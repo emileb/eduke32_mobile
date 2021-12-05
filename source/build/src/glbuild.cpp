@@ -158,7 +158,9 @@ void buildgl_useShaderProgram(uint32_t shaderID)
 //POGOTODO: these wrappers won't be needed down the line -- remove them once proper draw call organization is finished
 void buildgl_activeTexture(GLenum texture)
 {
+#ifndef USE_GLES2
     if (gl.currentActiveTexture != texture)
+#endif
     {
         gl.currentActiveTexture = texture;
         glActiveTexture(texture);
