@@ -596,6 +596,11 @@ void polymost_resetVertexPointers()
     polymost_outputGLDebugMessage(3, "polymost_resetVertexPointers()");
 
 #ifdef USE_GLES2
+
+#ifdef __ANDROID__ // This is needed to stop GL4ES library causing crash in glDrawArray
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float) * 5, 0);
+#endif
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 #else
     glBindBuffer(GL_ARRAY_BUFFER, drawpolyVertsID);
