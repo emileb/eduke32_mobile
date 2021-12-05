@@ -270,6 +270,17 @@ void G_CheckCommandLine(int32_t argc, char const * const * argv)
                     i++;
                     continue;
                 }
+                if (!Bstrcasecmp(c+1, "secondary_path"))
+                {
+                    if (argc > i+1)
+                    {
+                        initprintf("Adding secondary path: %s\n", argv[i+1]);
+                        addsearchpath_user(argv[i+1], SEARCHPATH_REMOVE);
+                        i++;
+                    }
+                    i++;
+                    continue;
+                }
 #endif
                 if (!Bstrcasecmp(c+1, "debughelp") || !Bstrcasecmp(c+1, "-debughelp"))
                 {
