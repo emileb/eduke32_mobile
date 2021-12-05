@@ -291,8 +291,7 @@ void PortableAction(int state, int action)
 			break;
 
 		case PORT_ACT_CONSOLE:
-			if(state)
-				PortableCommand("toggleconsole");
+			PortableKeyEvent(state, SDL_SCANCODE_GRAVE, 0);
 			break;
 
 		case PORT_ACT_INVUSE:
@@ -390,10 +389,11 @@ void PortableInit(int argc, const char ** argv)
 	eduke32_android_main(argc, (char **)argv);
 }
 
-bool            g_bindingbutton = false;
+bool g_bindingbutton = false;
 extern playerdata_t     *const g_player;
 extern int inExtraScreens; //In screens.c
 extern int myconnectindex;
+
 touchscreemode_t PortableGetScreenMode()
 {
 	if(g_bindingbutton) {
@@ -453,10 +453,6 @@ void Mobile_AM_controls(double *zoom, double *pan_x, double *pan_y)
 extern "C" int blockGamepad(void);
 
 #define ANDROIDMOVEFACTOR           64000
-#define ANDROIDLOOKFACTOR          1600000
-
-#define ANDROIDPITCHFACTORJOYSTICK          2000
-#define ANDROIDYAWFACTORJOYSTICK            4000
 
 void Mobile_IN_Move(ControlInfo *input)
 {
@@ -492,10 +488,8 @@ void Mobile_IN_Move(ControlInfo *input)
 	{
 		if(functionHeld & ((uint64_t)1<<((uint64_t)(n))))
 			CONTROL_ButtonFlags[n] = 1;
-		else
-			CONTROL_ButtonFlags[n] = 0;
 	}
-	//CONTROL_ButtonState = functionSticky | functionHeld;
+
 	functionSticky = 0;
 
 	//LOGI("CONTROL_ButtonState = %d", CONTROL_ButtonState);

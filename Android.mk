@@ -18,7 +18,7 @@ $(TOP_DIR)/MobileTouchControls  \
 $(TOP_DIR)/AudioLibs_OpenTouch/liboggvorbis/include  \
 
 
-LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DHAVE_XMP -DHAVE_VORBIS -DHAVE_FLAC -DENGINE_NAME=\"eduke32\"
+LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DHAVE_XMP -DHAVE_VORBIS -DHAVE_FLAC -DEDUKE32 -DENGINE_NAME=\"eduke32\"
 LOCAL_CPPFLAGS := -fexceptions
 
 
