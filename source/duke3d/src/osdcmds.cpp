@@ -1676,8 +1676,11 @@ int32_t registerosdcommands(void)
         { "mus_volume", "controls music volume", (void *)&ud.config.MusicVolume, CVAR_INT|CVAR_FUNCPTR, 0, 255 },
 
         { "osdhightile", "use content pack assets for console text if available" CVAR_BOOL_OPTSTR, (void *)&osdhightile, CVAR_BOOL, 0, 1 },
+#ifdef __ANDROID__
+        { "osdscale", "console text size", (void *)&osdscale, CVAR_FLOAT|CVAR_FUNCPTR, 2, 4 },
+#else
         { "osdscale", "console text size", (void *)&osdscale, CVAR_FLOAT|CVAR_FUNCPTR, 1, 4 },
-
+#endif
         { "r_camrefreshdelay", "minimum delay between security camera sprite updates, 120 = 1 second", (void *)&ud.camera_time, CVAR_INT, 1, 240 },
         { "r_drawweapon", "draw player weapon" CVAR_BOOL_OPTSTR "\n 2: icon only", (void *)&ud.drawweapon, CVAR_INT, 0, 2 },
         { "r_showfps", "show the frame rate counter" CVAR_BOOL_OPTSTR "\n 2: extra timing data\n 3: excessive timing data", (void *)&ud.showfps, CVAR_INT, 0, 3 },
