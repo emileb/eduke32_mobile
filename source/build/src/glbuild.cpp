@@ -92,6 +92,11 @@ void buildgl_setViewport(GLint x, GLint y, GLsizei width, GLsizei height)
 
 void buildgl_setDepthFunc(GLenum func)
 {
+#ifdef USE_GLES2
+    glDepthFunc(func);
+    return;
+#endif
+
     if ((GLenum)inthash_find(&gl.state[0], GL_DEPTH_FUNC) == func)
         return;
 
@@ -101,6 +106,11 @@ void buildgl_setDepthFunc(GLenum func)
 
 void buildgl_setAlphaFunc(GLenum func, GLfloat ref)
 {
+#ifdef USE_GLES2
+    glAlphaFunc(func, ref);
+    return;
+#endif
+
     if ((GLenum)inthash_find(&gl.state[0], GL_ALPHA_TEST_FUNC) == func && inthash_find(&gl.state[0], GL_ALPHA_TEST_REF) == *(int32_t *)&ref)
         return;
 
@@ -111,6 +121,11 @@ void buildgl_setAlphaFunc(GLenum func, GLfloat ref)
 
 void buildgl_setEnabled(GLenum key)
 {
+#ifdef USE_GLES2
+    glEnable(key);
+    return;
+#endif
+
     if (inthash_find(&gl.state[0], key) == GL_TRUE)
         return;
 
@@ -121,6 +136,11 @@ void buildgl_setEnabled(GLenum key)
 
 void buildgl_setDisabled(GLenum key)
 {
+#ifdef USE_GLES2
+    glDisable(key);
+    return;
+#endif
+
     if (inthash_find(&gl.state[0], key) == GL_FALSE)
         return;
 
@@ -147,6 +167,10 @@ void buildgl_activeTexture(GLenum texture)
 
 void buildgl_bindBuffer(GLenum target, uint32_t bufferID)
 {
+#ifdef USE_GLES2
+    glBindBuffer(target, bufferID);
+    return;
+#endif
     if ((uint32_t)inthash_find(&gl.state[ACTIVETEX], target) == bufferID)
         return;
 
@@ -161,6 +185,10 @@ void buildgl_bindBuffer(GLenum target, uint32_t bufferID)
 //POGOTODO: replace this and buildgl_activeTexture with proper draw call organization
 void buildgl_bindTexture(GLenum target, uint32_t textureID)
 {
+#ifdef USE_GLES2
+    glBindTexture(target, textureID);
+    return;
+#endif
     if (/*textureID == 0 ||*/
         /*gl.currentActiveTexture != GL_TEXTURE0 ||*/
         (uint32_t)inthash_find(&gl.state[ACTIVETEX], target) != textureID /*||
@@ -179,6 +207,9 @@ void buildgl_bindTexture(GLenum target, uint32_t textureID)
 
 void buildgl_resetSamplerObjects(void)
 {
+#ifdef USE_GLES2
+	return;
+#endif
     auto &f = glfiltermodes[clamp(gltexfiltermode, 0, NUMGLFILTERMODES-1)];
 
     if (!glIsSampler(samplerObjectIDs[1]))
