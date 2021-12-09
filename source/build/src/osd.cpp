@@ -629,8 +629,9 @@ static int osdfunc_history(osdcmdptr_t UNUSED(parm))
 //
 void OSD_Cleanup(void)
 {
+#ifndef __ANDROID__
     mi_register_output(NULL, NULL);
-
+#endif
     osd_clear();
     mutex_lock(&osd->log.mutex);
     MAYBE_FCLOSE_AND_NULL(osd->log.m_fp);
@@ -866,7 +867,9 @@ void OSD_SetLogFile(const char *fn)
         osdlogfn = fn;
     }
 
+#ifndef __ANDROID__
     mi_register_output((mi_output_fun *)(void *)&OSD_Puts, NULL);
+#endif
 }
 
 
