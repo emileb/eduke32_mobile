@@ -1453,8 +1453,9 @@ static void resizeglcheck(void)
 
     float m[4][4];
     Bmemset(m,0,sizeof(m));
+
     float const nearclip = 4.f / (gxyaspect * gyxscale * 512.f);
-    float const farclip = 8.f;
+    float const farclip = 32.f;
 
     m[0][0] = 1.f;
     m[1][1] = fxdimen / (fydimen * ratio);
