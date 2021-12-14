@@ -941,7 +941,9 @@ void polymost_initdrawpoly(void)
     else
     {
         drawpolyVerts = defaultDrawpolyVertsArray;
+#ifndef USE_GLES2
         glBufferData(GL_ARRAY_BUFFER, drawpolyVertsBufferLength*sizeof(float)*5, NULL, GL_STREAM_DRAW);
+#endif
     }
 
     buildgl_bindBuffer(GL_ARRAY_BUFFER, 0);
