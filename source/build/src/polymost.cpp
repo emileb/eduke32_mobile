@@ -7325,7 +7325,12 @@ int32_t polymost_lintersect(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 #define TSPR_OFFSET_FACTOR2 (1.f - (1.f/2048.f))
 #define TSPR_DEPTH_OFFSET_WALL(x) (x * r_spritedepthmul)
 #define TSPR_DEPTH_OFFSET_FLOOR(x) (x * r_spritedepthmul)
+
+#ifdef USE_GLES2
+#define TSPR_BASE_DEPTH (1.0008f)
+#else
 #define TSPR_BASE_DEPTH (1.0001f)
+#endif
 
 float r_spritedepth = TSPR_BASE_DEPTH;
 float r_spritedepthmul = (1.f/8.f);
