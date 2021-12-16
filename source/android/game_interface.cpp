@@ -490,7 +490,7 @@ void Mobile_IN_Move(ControlInfo *input)
 
 	for(int n = 0;n < 64; n++)
 	{
-		if(functionHeld & ((uint64_t)1<<((uint64_t)(n))))
+		if((functionHeld | functionSticky) & ((uint64_t)1<<((uint64_t)(n))))
 			CONTROL_ButtonFlags[n] = 1;
 		else
 			CONTROL_ButtonFlags[n] = 0;
