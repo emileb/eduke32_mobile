@@ -266,7 +266,11 @@ static void FreeGameList(void)
 }
 
 
+#ifdef __ANDROID__
+#define GRPCACHEFILE "../user_files/eduke32/grpfiles.cache"
+#else
 #define GRPCACHEFILE "grpfiles.cache"
+#endif
 static struct grpcache
 {
     struct grpcache *next;
