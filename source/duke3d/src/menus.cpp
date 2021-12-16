@@ -3310,7 +3310,7 @@ static void Menu_PreInput(MenuEntry_t *entry)
     {
 
     case MENU_KEYBOARDKEYS:
-        if (KB_KeyPressed(sc_Delete))
+        if (KB_KeyPressed(sc_Delete) || KB_KeyPressed(sc_BackSpace))
         {
             auto column = (MenuCustom2Col_t*)entry->entry;
             char key[2];
@@ -3320,6 +3320,7 @@ static void Menu_PreInput(MenuEntry_t *entry)
             CONFIG_MapKey(M_KEYBOARDKEYS.currentEntry, ud.config.KeyboardKeys[M_KEYBOARDKEYS.currentEntry][0], key[0], ud.config.KeyboardKeys[M_KEYBOARDKEYS.currentEntry][1], key[1]);
             S_PlaySound(KICK_HIT);
             KB_ClearKeyDown(sc_Delete);
+            KB_ClearKeyDown(sc_BackSpace);
         }
         break;
 
