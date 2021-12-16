@@ -1,5 +1,8 @@
 R"(
-#version 110
+#version 100
+precision highp int;
+precision highp float;
+
 #extension GL_ARB_shader_texture_lod : enable
 
 //include an additional space here so that we can programmatically search for and disable this preprocessor definition easily
@@ -76,10 +79,10 @@ void main()
 
     float shade = clamp((u_shade+max(u_visFactor*v_distance-0.5*u_shadeInterpolate,c_zero)), c_zero, u_numShades-c_one);
     float shadeFrac = mod(shade, c_one);
-    float colorIndex = texture2D(s_palswap, u_palswapPos+u_palswapSize*vec2(color.a, floor(shade)/u_numShades)).a;
+    float colorIndex = texture2D(s_palswap, u_palswapPos+u_palswapSize*vec2(color.a, floor(shade)/u_numShades) + vec2(0.2/2048.0, 0.2/2048.0)).a;
     colorIndex = c_basepalOffset + c_basepalScale*colorIndex;
     vec4 palettedColor = texture2D(s_palette, vec2(colorIndex, c_zero));
-    colorIndex = texture2D(s_palswap, u_palswapPos+u_palswapSize*vec2(color.a, (floor(shade)+c_one)/u_numShades)).a;
+    colorIndex = texture2D(s_palswap, u_palswapPos+u_palswapSize*vec2(color.a, (floor(shade)+c_one)/u_numShades) + vec2(0.2/2048.0, 0.2/2048.0)).a;
     colorIndex = c_basepalOffset + c_basepalScale*colorIndex;
     vec4 palettedColorNext = texture2D(s_palette, vec2(colorIndex, c_zero));
     palettedColor.rgb = mix(palettedColor.rgb, palettedColorNext.rgb, shadeFrac*u_shadeInterpolate);

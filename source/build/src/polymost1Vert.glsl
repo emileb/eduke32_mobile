@@ -1,5 +1,7 @@
 R"(
-#version 110
+#version 100
+precision highp int;
+precision highp float;
 
 varying vec4 v_color;
 varying float v_distance;
