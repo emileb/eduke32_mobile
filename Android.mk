@@ -177,7 +177,7 @@ LOCAL_SRC_FILES =  $(ANDROID_SRC_FILES) $(engine_objs) $(glad_objs) $(mact_objs)
 LOCAL_LDLIBS :=  -llog -lOpenSLES
 
 LOCAL_STATIC_LIBRARIES := logwritter flac xmp
-LOCAL_SHARED_LIBRARIES := touchcontrols openal SDL2 SDL2_mixer SDL2_image
+LOCAL_SHARED_LIBRARIES := touchcontrols openal SDL2 SDL2_mixer SDL2_image saffal
 
 
 include $(BUILD_SHARED_LIBRARY)

@@ -319,9 +319,6 @@ int32_t texcache_enabled(void)
 
 void texcache_openfiles(void)
 {
-#if defined USE_GLES2
-	return;
-#endif
     Bassert(!texcache.indexFilePtr && !texcache.dataFilePtr);
 
     Bstrcpy(ptempbuf, TEXCACHEFILE);
