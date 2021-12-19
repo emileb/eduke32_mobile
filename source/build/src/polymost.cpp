@@ -38,6 +38,9 @@ int32_t r_glowmapping = 1;
 int32_t r_detailmapping = 1;
 #endif
 
+#include <android/log.h>
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO,"JNITouchControlsUtils", __VA_ARGS__))
+
 int32_t r_animsmoothing = 1;
 int32_t r_downsize;
 int32_t r_downsizevar = -1;
@@ -974,6 +977,11 @@ void polymost_glinit()
     if (tilesheetSize > 8192)
         tilesheetSize = 8192;
 #endif
+
+#ifdef USE_GLES2 // Some GPUs with 8192 sized textures could crash when trying to go a glTexSubImage2D  because the GPU would copy the whole image and save it for a few frames
+	tilesheetSize = 2048;
+#endif
+
     tilesheetHalfTexelSize = { 0.5f/tilesheetSize, 0.5f/tilesheetSize };
 
     buildgl_resetSamplerObjects();
@@ -1669,6 +1677,7 @@ void uploadtextureindexed(int32_t doalloc, vec2_t offset, vec2_t siz, intptr_t t
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
 
+        LOGI("Texture %d %d",siz.y, siz.x );
         glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, siz.y, siz.x, 0, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) tile);
     }
     else
