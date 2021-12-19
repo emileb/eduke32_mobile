@@ -821,6 +821,13 @@ void CONFIG_ReadSettings(void)
 
     OSD_Exec(tempbuf);
 
+#ifdef __ANDROID__
+    if(ud.config.MusicDevice == ASS_AutoDetect || SF2_BankFile[0] == 2)
+    {
+        ud.config.MusicDevice = ASS_SF2;
+        Bstrcpy(SF2_BankFile, "soundfont.sf2");
+    }
+#endif
     ud.config.setupread = 2;
 
     return;

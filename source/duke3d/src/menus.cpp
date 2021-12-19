@@ -1295,7 +1295,7 @@ static char const *MEOSN_SOUND_MIDIDRIVER[] = {
 #ifdef _WIN32
     "Windows MME",
 #endif
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
     "ALSA MIDI",
 #endif
     ".sf2 synth",
@@ -1305,7 +1305,7 @@ static int32_t MEOSV_SOUND_MIDIDRIVER[] = {
 #ifdef _WIN32
     ASS_WinMM,
 #endif
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
     ASS_ALSA,
 #endif
     ASS_SF2,
