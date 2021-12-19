@@ -26,9 +26,13 @@
 #include "function.h"
 #include "anim.h"
 
+
+#include "gameTypes.h" // From Clibs_OpenTouch repo
+
 extern "C"
 {
 	extern int SDL_SendKeyboardKey(Uint8 state, SDL_Scancode scancode);
+	extern int gameType;
 #include "SmartToggle.h"
 }
 
@@ -44,6 +48,8 @@ static float look_pitch_joy = 0;
 static float look_yaw_mouse = 0;
 static float look_yaw_joy = 0;
 
+// Fill in to set the sub folder for the game in the user_files folder
+char userFilesSubFolder[256];
 
 int PortableKeyEvent(int state, int code, int unicode)
 {
@@ -387,6 +393,13 @@ extern "C"
 // Start game, does not return!
 void PortableInit(int argc, const char ** argv)
 {
+	if(gameType == RAZE_GAME_IONFURY)
+		strcpy(userFilesSubFolder, "ionfury");
+	else if(gameType == RAZE_GAME_EDUKE32)
+		strcpy(userFilesSubFolder, "eduke32");
+	else
+		strcpy(userFilesSubFolder, "unknown");
+
 	eduke32_android_main(argc, (char **)argv);
 }
 
