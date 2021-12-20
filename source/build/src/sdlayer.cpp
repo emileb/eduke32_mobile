@@ -350,62 +350,8 @@ static void sighandler(int signum)
 }
 #endif
 
-#ifdef __ANDROID__
-int mobile_halted = 0;
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-void G_Shutdown(void);
-#ifdef __cplusplus
-}
-#endif
 
-int sdlayer_mobilefilter(void *userdata, SDL_Event *event)
-{
-    switch (event->type)
-    {
-        case SDL_APP_TERMINATING:
-            // yes, this calls into the game, ugh
-            if (mobile_halted == 1)
-                G_Shutdown();
 
-            mobile_halted = 1;
-            return 0;
-        case SDL_APP_LOWMEMORY:
-            gltexinvalidatetype(INVALIDATE_ALL);
-            return 0;
-        case SDL_APP_WILLENTERBACKGROUND:
-            mobile_halted = 1;
-            return 0;
-        case SDL_APP_DIDENTERBACKGROUND:
-            gltexinvalidatetype(INVALIDATE_ALL);
-            // tear down video?
-            return 0;
-        case SDL_APP_WILLENTERFOREGROUND:
-            // restore video?
-            return 0;
-        case SDL_APP_DIDENTERFOREGROUND:
-            mobile_halted = 0;
-            return 0;
-        default:
-            return 1;//!halt;
-    }
-
-    UNREFERENCED_PARAMETER(userdata);
-}
-
-# include <setjmp.h>
-static jmp_buf eduke32_exit_jmp_buf;
-static int eduke32_return_value;
-
-void eduke32_exit_return(int retval)
-{
-    eduke32_return_value = retval;
-    longjmp(eduke32_exit_jmp_buf, 1);
-    EDUKE32_UNREACHABLE_SECTION(return);
-}
-#endif
 
 void sdlayer_sethints()
 {
@@ -464,13 +410,6 @@ int main(int argc, char *argv[])
     MicroProfileSetEnableAllGroups(true);
     MicroProfileSetForceMetaCounters(true);
 
-#ifdef __ANDROID__
-    if (setjmp(eduke32_exit_jmp_buf))
-    {
-        return eduke32_return_value;
-    }
-#endif
-
     sdlayer_sethints();
 
 #ifdef USE_OPENGL
@@ -498,8 +437,6 @@ int main(int argc, char *argv[])
     signal(SIGILL, sighandler);  /* clang -fcatch-undefined-behavior uses an ill. insn */
     signal(SIGABRT, sighandler);
     signal(SIGFPE, sighandler);
-#else
-    SDL_SetEventFilter(sdlayer_mobilefilter, NULL);
 #endif
 
 #ifdef _WIN32
@@ -1896,10 +1833,6 @@ void videoShowFrame(int32_t w)
     if (sdl_resize.x || sdl_minimized)
         return;
 
-#ifdef __ANDROID__
-    if (mobile_halted) return;
-#endif
-
 #ifdef USE_OPENGL
     if (!nogl)
     {
@@ -1907,10 +1840,6 @@ void videoShowFrame(int32_t w)
         {
             if (palfadedelta)
                 fullscreen_tint_gl(palfadergb.r, palfadergb.g, palfadergb.b, palfadedelta);
-
-#ifdef __ANDROID__XX
-            AndroidDrawControls();
-#endif
         }
         else
         {
@@ -2555,10 +2484,6 @@ int32_t handleevents_pollsdl(void)
 
 int32_t handleevents(void)
 {
-#ifdef __ANDROID__
-    if (mobile_halted) return 0;
-#endif
-
     int32_t rv;
 
     if (g_mouseBits & 2 && osd->flags & OSD_CAPTURE && SDL_HasClipboardText())

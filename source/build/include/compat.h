@@ -679,10 +679,6 @@ static FORCE_INLINE int32_t Blrintf(const float x)
 # define ERRprintf(fmt, ...) fprintf(stderr, fmt, ## __VA_ARGS__)
 #endif
 
-#ifdef __ANDROID__
-void eduke32_exit_return(int) ATTRIBUTE((noreturn));
-# define exit(x) eduke32_exit_return(x)
-#endif
 
 #ifdef DEBUGGINGAIDS
 #define Bexit(status)                                                                            \

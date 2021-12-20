@@ -5892,6 +5892,7 @@ static void G_Cleanup(void)
 void G_Shutdown(void)
 {
     CONFIG_WriteSetup(0);
+#ifndef __ANDROID__ // Don't do this as the process is killed
     S_SoundShutdown();
     S_MusicShutdown();
     CONTROL_Shutdown();
@@ -5901,6 +5902,7 @@ void G_Shutdown(void)
     FreeGroups();
     OSD_Cleanup();
     uninitgroupfile();
+#endif
     Bfflush(NULL);
 }
 
