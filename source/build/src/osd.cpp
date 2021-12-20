@@ -932,6 +932,10 @@ void OSD_SetParameters(int promptShade, int promptPal, int editShade, int editPa
     draw.highlight   = highlight;
 
     osd->flags |= flags;
+
+#ifdef __ANDROID__ // Always allow console on Android
+    osd->flags &= ~OSD_PROTECTED;
+#endif
 }
 
 

@@ -297,8 +297,7 @@ void PortableAction(int state, int action)
 			break;
 
 		case PORT_ACT_CONSOLE:
-			if(state)
-				PortableCommand("toggleconsole");
+			PortableKeyEvent(state, SDL_SCANCODE_GRAVE, state);
 			break;
 
 		case PORT_ACT_INVUSE:
