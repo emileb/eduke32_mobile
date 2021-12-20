@@ -1954,6 +1954,9 @@ int32_t videoUpdatePalette(int32_t start, int32_t num)
 //
 int32_t videoSetGamma(void)
 {
+#ifdef __ANDROID__
+	return 0;
+#endif
     if (novideo)
         return 0;
 
