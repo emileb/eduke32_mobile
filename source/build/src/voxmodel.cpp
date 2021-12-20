@@ -61,7 +61,7 @@ uint32_t gloadtex_indexed(const int32_t *picbuf, int32_t xsiz, int32_t ysiz)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ysiz, xsiz, 0, GL_RED, GL_UNSIGNED_BYTE, (char *) pic2);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, ysiz, xsiz, 0, GL_ALPHA, GL_UNSIGNED_BYTE, (char *) pic2);
 
     Xfree(pic2);
 
