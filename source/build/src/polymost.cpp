@@ -9387,7 +9387,9 @@ void polymost_fillpolygon(int32_t npoints)
     }
 
     polymost_updatePalette();
+#ifndef USE_GLES2
     buildgl_bindSamplerObject(0, pth->flags);
+#endif
     float const f = getshadefactor(globalshade);
 
     uint8_t const maskprops = (globalorientation>>7)&DAMETH_MASKPROPS;
