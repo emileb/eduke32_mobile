@@ -233,7 +233,11 @@ void CONFIG_SetDefaults(void)
     g_player[0].ps->aim_mode = 1;
 
     ud.setup.forcesetup       = 1;
+#ifdef __ANDROID__
+    ud.setup.noautoload       = 0;
+#else
     ud.setup.noautoload       = 1;
+#endif
     ud.setup.fullscreen       = 1;
     ud.setup.usemouse         = 1;
 
@@ -788,6 +792,7 @@ int CONFIG_ReadSetup(void)
         ud.setup.bpp = g_screenBppCmd;
 
     ud.screenfade = 0;
+    ud.setup.noautoload = 0; // This is now controlled by the command line
 #endif
 
 #ifdef POLYMER
