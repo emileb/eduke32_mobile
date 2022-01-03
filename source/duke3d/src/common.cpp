@@ -314,6 +314,9 @@ void G_ExtInit(void)
             }
             if (asperr == 0)
                 buildvfs_chdir(cwd);
+
+            if(g_modDir[0] != '/') // Create the mod folder so saves work, not sure where this is supposed to be created in the engine but it wasn't for me
+                buildvfs_mkdir(g_modDir,S_IRWXU);
        }
 #else
         if ((homedir = Bgethomedir()))
