@@ -909,6 +909,7 @@ void polymost_initdrawpoly(void)
 
 #ifdef USE_GLES2
     r_persistentStreamBuffer = 0;
+    r_detailmapping = 0;
 #endif
 
     drawpolyVertsBufferLength = r_drawpolyVertsBufferLength;
