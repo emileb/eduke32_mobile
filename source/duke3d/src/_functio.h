@@ -120,6 +120,74 @@ char gamefunctions[NUMGAMEFUNCTIONS][MAXGAMEFUNCLEN] =
 
 #ifdef __SETUP__
 
+#ifdef __ANDROID__
+const char keydefaults[NUMGAMEFUNCTIONS*2][MAXGAMEFUNCLEN] =
+   {
+   "W", "",
+   "S", "",
+   "Left", "",
+   "Right", "",
+   "LAlt", "RAlt",
+   "RCtrl", "",
+   "E", "",
+   "LShift", "RShift",
+   "", "",
+   "Space", "/",
+   "LCtrl", "",
+   "PgUp", "",
+   "PgDn", "",
+   "Insert", "",
+   "Delete", "Kpad.",
+   "A", "",
+   "D", "",
+   "Home", "",
+   "End", "",
+   "1", "",
+   "2", "",
+   "3", "",
+   "4", "",
+   "5", "",
+   "6", "",
+   "7", "",
+   "8", "",
+   "9", "",
+   "0", "",
+   "Enter", "KpdEnt",
+   "[", "",
+   "]", "",
+   "H", "",
+   "J", "",
+   "N", "",
+   "M", "",
+   "BakSpc", "",
+   "T", "",
+   "Tab", "",
+   "-", "",
+   "=", "",
+   "", "",
+   "ScrLck", "",
+   "Y", "",
+   "F", "",
+   "K", "",
+   "", "",
+   "", "",
+   "R", "",
+   "Q", "",
+   "'", "",
+   ";", "",
+   "`", "",
+   "", "",
+   "", "",
+   "", "",
+   "CapLck", "",
+   "X", "",
+   "F6", "",
+   "F9", "",
+   "", "",
+   "F7", "",
+   "C", "",
+   };
+#else
 const char keydefaults[NUMGAMEFUNCTIONS*2][MAXGAMEFUNCLEN] =
    {
    "W", "Kpad8",
@@ -186,6 +254,7 @@ const char keydefaults[NUMGAMEFUNCTIONS*2][MAXGAMEFUNCLEN] =
    "F7", "",
    "C", "",
    };
+#endif
 
 const char oldkeydefaults[NUMGAMEFUNCTIONS*2][MAXGAMEFUNCLEN] =
    {
