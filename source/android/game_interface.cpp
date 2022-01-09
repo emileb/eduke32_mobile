@@ -319,6 +319,17 @@ void PortableAction(int state, int action)
 		case PORT_ACT_WEAP_ALT:
 			changeActionState(state, gamefunc_Alt_Weapon);
 			break;
+
+		// IONFURY
+		case PORT_ACT_RELOAD:
+			changeActionState(state, gamefunc_Steroids); // Reload is Steroids
+			break;
+		case PORT_ACT_MEDKIT:
+			changeActionState(state, gamefunc_MedKit);
+			break;
+		case PORT_ACT_RADAR:
+			changeActionState(state, gamefunc_NightVision); // Radar is Nightvision
+			break;
 		}
 	}
 }
