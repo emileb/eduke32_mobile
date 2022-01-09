@@ -3364,6 +3364,9 @@ static void Menu_PreOptionListDraw(MenuEntry_t *entry, const vec2_t origin)
     }
 }
 
+#ifdef __ANDROID__
+extern bool  g_bindingbutton;
+#endif
 static int32_t Menu_PreCustom2ColScreen(MenuEntry_t *entry)
 {
     if (g_currentMenu == MENU_KEYBOARDKEYS)
@@ -3392,9 +3395,7 @@ static int32_t Menu_PreCustom2ColScreen(MenuEntry_t *entry)
     return 0;
 }
 
-#ifdef __ANDROID__
-extern bool  g_bindingbutton;
-#endif
+
 static void Menu_PreCustom2ColScreenDraw(MenuEntry_t *entry, const vec2_t origin)
 {
     if (g_currentMenu == MENU_KEYBOARDKEYS)
@@ -3405,9 +3406,7 @@ static void Menu_PreCustom2ColScreenDraw(MenuEntry_t *entry, const vec2_t origin
                           "Press \"Escape\" To Cancel"
                           , M_KEYBOARDKEYS.currentColumn?"secondary":"primary", entry->name);
         mgametextcenter(origin.x, origin.y + (90<<16), tempbuf);
-#ifdef __ANDROID__
-        g_bindingbutton = true;
-#endif
+
     }
 }
 
@@ -7613,6 +7612,9 @@ static void Menu_RunInput(Menu_t *cm)
                     }
                     else if (Menu_PreCustom2ColScreen(currentry))
                         ((MenuCustom2Col_t*)currentry->entry)->screenOpen = 0;
+#ifdef __ANDROID__
+					g_bindingbutton = ((MenuCustom2Col_t*)currentry->entry)->screenOpen;
+#endif
                 }
             }
 

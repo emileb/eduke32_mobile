@@ -409,7 +409,6 @@ extern int myconnectindex;
 touchscreemode_t PortableGetScreenMode()
 {
 	if(g_bindingbutton) {
-		g_bindingbutton = false;
 		return TS_CUSTOM;
 	}
 	else if (g_animPtr || inExtraScreens)
