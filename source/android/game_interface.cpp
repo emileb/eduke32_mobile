@@ -129,7 +129,7 @@ void changeActionState(int state, int action)
 
 bool buttonDown(int action)
 {
-	return false; // TODO
+	return !!(functionHeld && ((uint64_t)1<<((uint64_t)(action))));
 }
 
 void PortableAction(int state, int action)
