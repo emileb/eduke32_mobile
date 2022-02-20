@@ -78,11 +78,9 @@ engine_objs := \
     build/src/tilepacker.cpp \
     build/src/a-c.cpp \
     build/src/sdlayer.cpp \
-
-
-    #build/src/smmalloc.cpp \
-    #build/src/smmalloc_tls.cpp \
-    #build/src/smmalloc_generic.cpp
+    build/src/smmalloc.cpp \
+    build/src/smmalloc_tls.cpp \
+    build/src/smmalloc_generic.cpp
 
 
 glad_objs := \

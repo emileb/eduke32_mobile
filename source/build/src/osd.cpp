@@ -10,7 +10,9 @@
 #include "editor.h"
 #include "osd.h"
 #include "scancodes.h"
+#ifndef __ANDROID__
 #include "mimalloc.h"
+#endif
 #include "atomiclist.h"
 
 #define XXH_STATIC_LINKING_ONLY
