@@ -103,9 +103,7 @@ char modechange=1;
 char offscreenrendering=0;
 char videomodereset = 0;
 int32_t nofog=0;
-#ifndef EDUKE32_GLES
 static uint16_t sysgamma[3][256];
-#endif
 #ifdef USE_OPENGL
 // OpenGL stuff
 char nogl=0;
@@ -277,7 +275,7 @@ int32_t wm_ynbox(const char *name, const char *fmt, ...)
 
 void wm_setapptitle(const char *name)
 {
-#ifndef EDUKE32_TOUCH_DEVICES
+#ifndef __ANDROID__
     if (name != apptitle)
         Bstrncpyz(apptitle, name, sizeof(apptitle));
 
@@ -323,7 +321,7 @@ void wm_setapptitle(const char *name)
 //
 
 /* XXX: libexecinfo could be used on systems without gnu libc. */
-#if !defined _WIN32 && defined __GNUC__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__
+#if !defined _WIN32 && defined __GNUC__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__  && !defined __ANDROID__
 # define PRINTSTACKONSEGV 1
 # include <execinfo.h>
 #endif
@@ -363,63 +361,6 @@ static void sighandler(int signum)
 }
 #endif
 
-#ifdef __ANDROID__
-int mobile_halted = 0;
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-void G_Shutdown(void);
-#ifdef __cplusplus
-}
-#endif
-
-int sdlayer_mobilefilter(void *userdata, SDL_Event *event)
-{
-    switch (event->type)
-    {
-        case SDL_APP_TERMINATING:
-            // yes, this calls into the game, ugh
-            if (mobile_halted == 1)
-                G_Shutdown();
-
-            mobile_halted = 1;
-            return 0;
-        case SDL_APP_LOWMEMORY:
-            gltexinvalidatetype(INVALIDATE_ALL);
-            return 0;
-        case SDL_APP_WILLENTERBACKGROUND:
-            mobile_halted = 1;
-            return 0;
-        case SDL_APP_DIDENTERBACKGROUND:
-            gltexinvalidatetype(INVALIDATE_ALL);
-            // tear down video?
-            return 0;
-        case SDL_APP_WILLENTERFOREGROUND:
-            // restore video?
-            return 0;
-        case SDL_APP_DIDENTERFOREGROUND:
-            mobile_halted = 0;
-            return 0;
-        default:
-            return 1;//!halt;
-    }
-
-    UNREFERENCED_PARAMETER(userdata);
-}
-
-# include <setjmp.h>
-static jmp_buf eduke32_exit_jmp_buf;
-static int eduke32_return_value;
-
-void eduke32_exit_return(int retval)
-{
-    eduke32_return_value = retval;
-    longjmp(eduke32_exit_jmp_buf, 1);
-    EDUKE32_UNREACHABLE_SECTION(return);
-}
-#endif
-
 void sdlayer_sethints()
 {
 #if defined _WIN32 && !defined _MSC_VER
@@ -454,9 +395,9 @@ void sdlayer_sethints()
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nCmdShow)
 #elif defined __ANDROID__
 # ifdef __cplusplus
-extern "C" int eduke32_android_main(int argc, char const *argv[]);
+extern "C" int eduke32_android_main(int argc, char *argv[]);
 # endif
-int eduke32_android_main(int argc, char const *argv[])
+int eduke32_android_main(int argc, char *argv[])
 #elif defined GEKKO
 int SDL_main(int argc, char *argv[])
 #else
@@ -498,13 +439,6 @@ int main(int argc, char *argv[])
     MicroProfileSetEnableAllGroups(true);
     MicroProfileSetForceMetaCounters(true);
 
-#ifdef __ANDROID__
-    if (setjmp(eduke32_exit_jmp_buf))
-    {
-        return eduke32_return_value;
-    }
-#endif
-
     sdlayer_sethints();
 
 #ifdef USE_OPENGL
@@ -527,8 +461,11 @@ int main(int argc, char *argv[])
 
     buildkeytranslationtable();
 
-#ifdef __ANDROID__
-    SDL_SetEventFilter(sdlayer_mobilefilter, NULL);
+#ifndef __ANDROID__
+    signal(SIGSEGV, sighandler);
+    signal(SIGILL, sighandler);  /* clang -fcatch-undefined-behavior uses an ill. insn */
+    signal(SIGABRT, sighandler);
+    signal(SIGFPE, sighandler);
 #endif
 
 #ifdef _WIN32
@@ -1349,6 +1286,13 @@ static int sortmodes(const void *a_, const void *b_)
 static char modeschecked=0;
 
 #if SDL_MAJOR_VERSION >= 2
+
+#ifdef __ANDROID__
+extern int g_screenWidthCmd;
+extern int g_screenHeightCmd;
+extern int g_screenBppCmd;
+#endif
+
 void videoGetModes(int display)
 {
     int32_t i, maxx = 0, maxy = 0;
@@ -1390,6 +1334,10 @@ void videoGetModes(int display)
             maxy = dispmode.h;
         }
     }
+
+#ifdef __ANDROID__
+    SDL_ADDMODE(g_screenWidthCmd, g_screenHeightCmd, g_screenBppCmd, 1);
+#endif
 
     SDL_CHECKFSMODES(maxx, maxy);
 
@@ -1589,9 +1537,7 @@ void sdlayer_setvideomode_opengl(void)
 //    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
     glViewport(0,0,xres,yres);
 
-#ifndef EDUKE32_GLES
     glDisable(GL_DITHER);
-#endif
 
     fill_glinfo();
 }
@@ -1670,7 +1616,6 @@ int setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int3
 #endif
 
     // save the current system gamma to determine if gamma is available
-#ifndef EDUKE32_GLES
     if (!gammabrightness)
     {
         if (nogl)
@@ -1688,7 +1633,6 @@ int setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int3
         }
         else gammabrightness = 1;
     }
-#endif
 
 #if SDL_MAJOR_VERSION >= 2
     int const displayindex = SDL_GetWindowDisplayIndex(sdl_window);
@@ -1785,6 +1729,29 @@ int setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int3
 }
 
 #if SDL_MAJOR_VERSION >= 2
+
+#ifdef USE_GLES2
+#include <dlfcn.h>
+static void* PosixGetProcAddressMobile (const char * name)
+{
+  static void* h = NULL;
+  static void* gpa = NULL;
+
+  void * ret = 0;
+
+    if (h == NULL)
+    {
+        h = dlopen("libGL4ES.so", RTLD_LAZY | RTLD_LOCAL);
+        void (*initialize_gl4es)(void)  =   (void (*)(void))(dlsym(h, "initialize_gl4es"));
+        initialize_gl4es();
+    }
+
+    ret =  dlsym(h, (const char*)name);
+
+  return ret;
+}
+#endif
+
 int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
 {
     int32_t regrab = 0, ret;
@@ -1821,17 +1788,17 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
 
         if (nogl)
             return -1;
-
+#ifdef USE_GLES2
+       SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+       SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+	   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
         struct glattribs
         {
             SDL_GLattr attr;
             int32_t value;
         } sdlayer_gl_attributes[] =
         {
-#ifdef EDUKE32_GLES
-              { SDL_GL_CONTEXT_MAJOR_VERSION, 1 },
-              { SDL_GL_CONTEXT_MINOR_VERSION, 1 },
-#endif
               { SDL_GL_CONTEXT_FLAGS,
 #ifndef NDEBUG
               SDL_GL_CONTEXT_DEBUG_FLAG |
@@ -1845,7 +1812,7 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
           };
 
         SDL_GL_ATTRIBUTES(i, sdlayer_gl_attributes);
-
+#endif
         /* HACK: changing SDL GL attribs only works before surface creation,
             so we have to create a new surface in a different format first
             to force the surface we WANT to be recreated instead of reused. */
@@ -1862,8 +1829,11 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
             LOG_F(ERROR, "Unable to set video mode: %s failed: %s.", sdl_window ? "SDL_GL_CreateContext" : "SDL_GL_CreateWindow",  SDL_GetError());
             nogl = 1;
         }
-
+#ifdef USE_GLES2
+        gladLoadGLLoader(PosixGetProcAddressMobile);
+#else
         gladLoadGLLoader(SDL_GL_GetProcAddress);
+#endif
         if (GLVersion.major < 2)
         {
             LOG_F(ERROR, "Video driver does not support OpenGL version 2 or greater; all OpenGL modes are unavailable.");
@@ -2031,10 +2001,6 @@ void videoShowFrame(int32_t w)
     if (sdl_resize.x || sdl_minimized)
         return;
 
-#ifdef __ANDROID__
-    if (mobile_halted) return;
-#endif
-
 #ifdef USE_OPENGL
     if (!nogl)
     {
@@ -2042,10 +2008,6 @@ void videoShowFrame(int32_t w)
         {
             if (palfadedelta)
                 fullscreen_tint_gl(palfadergb.r, palfadergb.g, palfadergb.b, palfadedelta);
-
-#ifdef __ANDROID__
-            AndroidDrawControls();
-#endif
         }
         else
         {
@@ -2173,6 +2135,9 @@ int32_t videoUpdatePalette(int32_t start, int32_t num)
 //
 int32_t videoSetGamma(void)
 {
+#ifdef __ANDROID__
+	return 0;
+#endif
     if (novideo)
         return 0;
 
@@ -2237,7 +2202,7 @@ int32_t videoSetGamma(void)
     return i;
 }
 
-#if !defined __APPLE__ && !defined EDUKE32_TOUCH_DEVICES
+#if !defined __APPLE__ && !defined EDUKE32_TOUCH_DEVICES && !defined __ANDROID__
 extern "C" struct sdlappicon sdlappicon;
 static inline SDL_Surface *loadappicon(void)
 {
@@ -2731,10 +2696,6 @@ int32_t handleevents_pollsdl(void)
 
 int32_t handleevents(void)
 {
-#ifdef __ANDROID__
-    if (mobile_halted) return 0;
-#endif
-
     int32_t rv;
 
 #if SDL_VERSION_ATLEAST(2, 0, 9)

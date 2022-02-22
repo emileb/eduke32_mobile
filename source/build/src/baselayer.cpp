@@ -151,7 +151,9 @@ static int osdfunc_bucketlist(osdcmdptr_t UNUSED(parm))
 static int osdfunc_heapinfo(osdcmdptr_t UNUSED(parm))
 {
     UNREFERENCED_CONST_PARAMETER(parm);
+#ifndef __ANDROID__
     mi_stats_print(NULL);
+#endif
     return OSDCMD_OK;
 }
 
@@ -580,11 +582,6 @@ void fill_glinfo(void)
         glinfo.texcompr = 0;
     }
 # endif
-
-#if defined EDUKE32_GLES
-    // don't bother checking because ETC2 et al. are not listed in extensions anyway
-    glinfo.texcompr = 1; // !!Bstrstr(glinfo.extensions, "GL_OES_compressed_ETC1_RGB8_texture");
-#endif
 
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glinfo.maxanisotropy);
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &glinfo.maxTextureSize);
