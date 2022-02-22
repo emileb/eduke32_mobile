@@ -19,9 +19,6 @@
 #include "osd.h"
 #include "pragmas.h"
 
-#ifdef __ANDROID__
-#include "android.h"
-#endif
 
 // TODO: add mact cvars and make this user configurable
 #define USERINPUTDELAY 500
@@ -521,9 +518,6 @@ static void controlPollDevices(ControlInfo *const info)
     memset(info, 0, sizeof(ControlInfo));
     handleevents();
 
-#ifdef __ANDROID__
-    CONTROL_Android_PollDevices(info);
-#endif
 
     if (CONTROL_MouseEnabled)
         controlUpdateMouseState(info);
@@ -631,9 +625,6 @@ void CONTROL_ClearButton(int whichbutton)
 {
     if (CONTROL_CheckRange(whichbutton)) return;
 
-#ifdef __ANDROID__
-    CONTROL_Android_ClearButton(whichbutton);
-#endif
 
     BUTTONCLEAR(whichbutton);
     CONTROL_Flags[whichbutton].cleared = TRUE;
@@ -695,13 +686,18 @@ static void controlUpdateGameFunctions(void)
     memset(CONTROL_ButtonFlags, 0, sizeof(CONTROL_ButtonFlags));
 }
 
+#ifdef __ANDROID__
+void Mobile_IN_Move(ControlInfo *info);
+#endif
+
 void CONTROL_GetInput(ControlInfo *info)
 {
-#ifdef __ANDROID__
-    CONTROL_Android_PollDevices(info);
-#endif
+
     controlPollDevices(info);
     controlUpdateGameFunctions();
+#ifdef __ANDROID__
+    Mobile_IN_Move(info);
+#endif
     inputchecked = 1;
 }
 

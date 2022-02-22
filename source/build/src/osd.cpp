@@ -10,7 +10,9 @@
 #include "editor.h"
 #include "osd.h"
 #include "scancodes.h"
+#ifndef __ANDROID__
 #include "mimalloc.h"
+#endif
 #include "atomiclist.h"
 
 #define XXH_STATIC_LINKING_ONLY
@@ -635,8 +637,9 @@ static int osdfunc_history(osdcmdptr_t UNUSED(parm))
 //
 void OSD_Cleanup(void)
 {
+#ifndef __ANDROID__
     mi_register_output(NULL, NULL);
-
+#endif
     osd_clear();
     mutex_lock(&osd->log.mutex);
 
@@ -856,8 +859,9 @@ void OSD_SetLogFile(const char *fn)
         OSD_Init();
 
     osdlogfn = fn;
-
+#ifndef __ANDROID__
     mi_register_output((mi_output_fun *)(void *)&OSD_Puts, NULL);
+#endif
 }
 
 
@@ -922,6 +926,10 @@ void OSD_SetParameters(int promptShade, int promptPal, int editShade, int editPa
     draw.highlight   = highlight;
 
     osd->flags |= flags;
+
+#ifdef __ANDROID__ // Always allow console on Android
+    osd->flags &= ~OSD_PROTECTED;
+#endif
 }
 
 

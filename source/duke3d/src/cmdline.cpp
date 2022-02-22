@@ -152,6 +152,11 @@ static void G_AddDemo(const char* param)
         g_noLogo = 1;
     }
 }
+#ifdef __ANDROID__
+int g_screenWidthCmd = 0;
+int g_screenHeightCmd = 0;
+int g_screenBppCmd = 0;
+#endif
 
 void G_CheckCommandLine(int32_t argc, char const * const * argv)
 {
@@ -237,6 +242,49 @@ void G_CheckCommandLine(int32_t argc, char const * const * argv)
                     i++;
                     continue;
                 }
+#ifdef __ANDROID__
+                if (!Bstrcasecmp(c+1, "screen_width"))
+                {
+                    if (argc > i+1)
+                    {
+                        g_screenWidthCmd = atoi(argv[i+1]);
+                        i++;
+                    }
+                    i++;
+                    continue;
+                }
+                if (!Bstrcasecmp(c+1, "screen_height"))
+                {
+                    if (argc > i+1)
+                    {
+                        g_screenHeightCmd = atoi(argv[i+1]);
+                        i++;
+                    }
+                    i++;
+                    continue;
+                }
+                if (!Bstrcasecmp(c+1, "screen_bpp"))
+                {
+                    if (argc > i+1)
+                    {
+                        g_screenBppCmd = atoi(argv[i+1]);
+                        i++;
+                    }
+                    i++;
+                    continue;
+                }
+                if (!Bstrcasecmp(c+1, "secondary_path"))
+                {
+                    if (argc > i+1)
+                    {
+                        initprintf("Adding secondary path: %s\n", argv[i+1]);
+                        addsearchpath_user(argv[i+1], SEARCHPATH_REMOVE);
+                        i++;
+                    }
+                    i++;
+                    continue;
+                }
+#endif
                 if (!Bstrcasecmp(c+1, "debughelp") || !Bstrcasecmp(c+1, "-debughelp"))
                 {
                     G_ShowDebugHelp();
