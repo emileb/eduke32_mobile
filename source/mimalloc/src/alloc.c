@@ -17,7 +17,9 @@ terms of the MIT license. A copy of the license can be found in the file
 #include <stdlib.h>      // malloc, abort
 
 #define MI_IN_ALLOC_C
+#ifndef __ANDROID__
 #include "alloc-override.c"
+#endif
 #undef MI_IN_ALLOC_C
 
 // ------------------------------------------------------

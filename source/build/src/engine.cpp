@@ -10774,7 +10774,9 @@ static FORCE_INLINE int32_t have_maptext(void)
 static int enginePrepareLoadBoard(buildvfs_kfd fil, vec3_t *dapos, int16_t *daang, int16_t *dacursectnum)
 {
     initspritelists();
+#ifndef __ANDROID__
     mi_collect(true);
+#endif
     DO_FREE_AND_NULL(reachablesectors);
 
     Bmemset(show2dsector, 0, sizeof(show2dsector));
@@ -11946,8 +11948,14 @@ int32_t videoSetGameMode(char davidoption, int32_t daupscaledxdim, int32_t daups
 #ifdef USE_OPENGL
     if (nogl) dabpp = 8;
 #endif
+
+#ifdef __ANDROID__
+    daupscaledxdim = max(320, daupscaledxdim);
+    daupscaledydim = max(200, daupscaledydim);
+#else
     daupscaledxdim = max(640, daupscaledxdim);
     daupscaledydim = max(400, daupscaledydim);
+#endif
 
     if (in3dmode() && videomodereset == 0 && (davidoption == fullscreen) && (r_displayindex == g_displayindex)
         && (xres == daupscaledxdim) && (yres == daupscaledydim) && (bpp == dabpp) && (upscalefactor == daupscalefactor))

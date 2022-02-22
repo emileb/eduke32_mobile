@@ -1,4 +1,7 @@
-#version 120
+R"(
+#version 100
+precision highp int;
+precision highp float;
 
 varying vec4 v_color;
 varying float v_distance;
@@ -31,3 +34,4 @@ void main()
    v_color = gl_Color;
    v_distance = gl_Vertex.z;
 }
+)"

@@ -12,7 +12,9 @@
 #define lru_h__
 
 #include "compat.h"
+#ifndef __ANDROID__
 #include "mimalloc-override.h"
+#endif
 
 #include <cstdlib>
 #include <cstring>
@@ -44,9 +46,13 @@ private:
     int m_count;
 
 public:
+#ifdef __ANDROID__
+    CircularQueue() { m_items = (T *)calloc(Capacity, sizeof(T)); clear(); }
+    ~CircularQueue() { free(m_items); }
+#else
     CircularQueue() { m_items = (T *)mi_calloc(Capacity, sizeof(T)); clear(); }
     ~CircularQueue() { mi_free(m_items); }
-
+#endif
     void clear()
     {
         m_head  = -1;
@@ -70,7 +76,7 @@ public:
             ++m_count;
         if ((++m_head == m_tail) | (m_tail == -1))
         {
-            if ((m_tail != -1) & ((ResetItems & RF_FREE) == RF_FREE))
+            if ((ResetItems & RF_FREE) && (m_tail != -1))
                 Xfree(m_items[m_tail]);
             m_tail = (m_tail + 1) % Capacity;
         }

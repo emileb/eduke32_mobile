@@ -19,12 +19,15 @@
 // 	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // 	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // 	THE SOFTWARE.
+#ifndef __ANDROID__
 #include "mimalloc-new-delete.h"
-
+#endif
 #if __SANITIZE_ADDRESS__ != 1
 
 #include "compat.h"
+#ifndef __ANDROID__
 #include "mimalloc-override.h"
+#endif
 #include "smmalloc.h"
 #include <stdlib.h>
 
