@@ -283,6 +283,9 @@ void buildgl_resetSamplerObjects(void)
 
 void buildgl_bindSamplerObject(int texunit, int32_t pth_method)
 {
+#ifdef USE_GLES2
+	return;
+#endif
     if (!buildgl_samplerObjectsEnabled())
     {
         gl.currentBoundSampler[texunit] = SAMPLER_NONE;
