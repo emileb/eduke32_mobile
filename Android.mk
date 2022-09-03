@@ -22,7 +22,7 @@ $(TOP_DIR)/AudioLibs_OpenTouch/liboggvorbis/include  \
 
 LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DHAVE_XMP -DHAVE_VORBIS -DHAVE_FLAC -DENGINE_NAME=\"eduke32\" -DEDUKE32 -w -Wno-format  -Wformat=0 -Wno-format-security
 LOCAL_CPPFLAGS := -fexceptions
-
+#-DUSE_LIBVPX
 
 engine_objs := \
     build/src/2d.cpp \
