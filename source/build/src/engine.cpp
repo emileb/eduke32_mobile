@@ -10573,7 +10573,9 @@ static FORCE_INLINE int32_t have_maptext(void)
 static int enginePrepareLoadBoard(buildvfs_kfd fil, vec3_t *dapos, int16_t *daang, int16_t *dacursectnum)
 {
     initspritelists();
+#ifndef __ANDROID__
     mi_collect(true);
+#endif
     DO_FREE_AND_NULL(reachablesectors);
 
     Bmemset(show2dsector, 0, sizeof(show2dsector));
