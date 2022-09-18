@@ -328,7 +328,12 @@ static FORCE_INLINE int dukeMaybeDrawFrame(void)
 
     if (g_vm_preempt && !g_saveRequested && !g_frameJustDrawn && timerGetNanoTicks() >= g_lastFrameEndTime + (g_lastFrameEndTime - g_lastFrameStartTime - g_lastFrameDuration) && engineFPSLimit())
     {
+#ifdef __ANDROID__
+        void drawframe();
+        drawframe();
+#else
         g_switchRoutine(co_drawframe);
+#endif
         return 1;
     }
 

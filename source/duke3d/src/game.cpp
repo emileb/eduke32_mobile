@@ -6442,6 +6442,42 @@ void Net_DedicatedServerStdin(void)
 }
 #endif
 
+#ifdef __ANDROID__
+void drawframe()
+{
+    g_lastFrameStartTime = timerGetNanoTicks();
+
+    if (!g_saveRequested)
+    {
+        // only allow binds to function if the player is actually in a game (not in a menu, typing, et cetera) or demo
+        CONTROL_BindsEnabled = !!(g_player[myconnectindex].ps->gm & (MODE_GAME|MODE_DEMO));
+
+        G_HandleLocalKeys();
+        OSD_DispatchQueued();
+        P_GetInput(myconnectindex);
+    }
+
+    int const smoothratio = calc_smoothratio(totalclock, ototalclock);
+
+    G_DrawRooms(screenpeek, smoothratio);
+
+    if (videoGetRenderMode() >= REND_POLYMOST)
+        G_DrawBackground();
+
+    G_DisplayRest(smoothratio);
+
+    g_frameJustDrawn = true;
+    g_lastFrameEndTime = timerGetNanoTicks();
+    g_lastFrameDuration = g_lastFrameEndTime - g_lastFrameStartTime;
+    g_frameCounter++;
+
+    videoNextPage();
+    S_Update();
+    g_lastFrameEndTime2 = timerGetNanoTicks();
+    g_lastFrameDuration2 = g_lastFrameEndTime2 - g_lastFrameStartTime;
+}
+#endif
+
 static void drawframe_entry(mco_coro *co)
 {
     do
@@ -6515,6 +6551,9 @@ void dukeFillInputForTic(void)
 
 void dukeCreateFrameRoutine(void)
 {
+#ifdef __ANDROID__
+    return;
+#endif
     static mco_desc co_drawframe_desc;
     mco_result res;
 
@@ -7155,8 +7194,11 @@ MAIN_LOOP_RESTART:
                 Net_DedicatedServerStdin();
 #endif
             }
-
+#ifdef __ANDROID__
+            drawframe();
+#else
             g_switchRoutine(co_drawframe);
+#endif
         }
 
         // handle CON_SAVE and CON_SAVENN
