@@ -222,6 +222,10 @@ void PortableAction(int state, int action)
 			changeActionState(state, gamefunc_Jump);
 			break;
 
+		case PORT_ACT_KICK:
+			changeActionState(state, gamefunc_Quick_Kick);
+			break;
+
 		case PORT_ACT_DOWN:
 			changeActionState(state, gamefunc_Crouch);
 			break;
