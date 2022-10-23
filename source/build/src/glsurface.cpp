@@ -100,7 +100,7 @@ bool glsurface_initialize(vec2_t bufferResolution)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, bufferRes.x, bufferRes.y, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bufferRes.x, bufferRes.y, 0, GL_ALPHA, GL_UNSIGNED_BYTE, 0);
 
     glsurface_setPalette(curpalettefaded);
 
@@ -133,7 +133,7 @@ bool glsurface_initialize(vec2_t bufferResolution)
          void main()\n\
          {\n\
              vec4 color = texture2D(s_texture, v_texCoord.xy);\n\
-             color.r = c_paletteOffset + c_paletteScale*color.r;\n\
+             color.r = c_paletteOffset + c_paletteScale*color.a;\n\
              color.rgb = texture2D(s_palette, color.rg).rgb;\n\
              \n\
              // DEBUG \n\
@@ -233,8 +233,25 @@ void glsurface_blitBuffer()
     if (!buffer)
         return;
 
+#ifdef __ANDROID__
+    glUseProgram(shaderProgramID);
+	glDisable(GL_BLEND);
+
+	glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, paletteTexID);
+
+    glBindBuffer(GL_ARRAY_BUFFER, quadVertsID);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float) * 5, 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(float) * 5, (const void*) (sizeof(float) * 3));
+
+	glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, bufferTexID);
+#endif
+
     glActiveTexture(GL_TEXTURE0);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bufferRes.x, bufferRes.y, GL_RED, GL_UNSIGNED_BYTE, (void*) buffer);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bufferRes.x, bufferRes.y, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) buffer);
 
     glDrawArrays(GL_TRIANGLE_STRIP,
                  0,

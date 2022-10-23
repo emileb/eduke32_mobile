@@ -183,19 +183,7 @@ void CONFIG_SetDefaults(void)
 {
     ud.config.scripthandle = -1;
 
-#ifdef __ANDROID__
-    droidinput.forward_sens = 5.f;
-    droidinput.gameControlsAlpha = 0.5;
-    droidinput.hideStick = 0;
-    droidinput.pitch_sens = 5.f;
-    droidinput.quickSelectWeapon = 1;
-    droidinput.strafe_sens = 5.f;
-    droidinput.toggleCrouch = 1;
-    droidinput.yaw_sens = 5.f;
 
-    ud.setup.xdim = droidinfo.screen_width;
-    ud.setup.ydim = droidinfo.screen_height;
-#else
 # if defined RENDERTYPESDL && SDL_MAJOR_VERSION >= 2
     uint32_t inited = SDL_WasInit(SDL_INIT_VIDEO);
     if (inited == 0)
@@ -215,7 +203,6 @@ void CONFIG_SetDefaults(void)
         ud.setup.xdim = 1024;
         ud.setup.ydim = 768;
     }
-#endif
 
 #ifdef USE_OPENGL
     ud.setup.bpp = 32;
@@ -225,8 +212,6 @@ void CONFIG_SetDefaults(void)
 
 #if defined(_WIN32)
     ud.config.MixRate = 44100;
-#elif defined __ANDROID__
-    ud.config.MixRate = droidinfo.audio_sample_rate;
 #else
     ud.config.MixRate = 48000;
 #endif
@@ -681,7 +666,11 @@ void CONFIG_SetGameControllerDefaultsClear()
         CONFIG_SetJoystickAnalogAxisFunction(i, -1);
     }
 }
-
+#ifdef __ANDROID__
+extern int g_screenWidthCmd;
+extern int g_screenHeightCmd;
+extern int g_screenBppCmd;
+#endif
 int CONFIG_ReadSetup(void)
 {
     char tempbuf[1024];
@@ -786,6 +775,20 @@ int CONFIG_ReadSetup(void)
 
     if (ud.setup.bpp < 8) ud.setup.bpp = 32;
 
+#ifdef __ANDROID__
+    if(g_screenWidthCmd)
+        ud.setup.xdim = g_screenWidthCmd;
+
+    if(g_screenHeightCmd)
+        ud.setup.ydim = g_screenHeightCmd;
+
+    if(g_screenBppCmd)
+        ud.setup.bpp = g_screenBppCmd;
+
+    ud.screenfade = 0;
+    ud.setup.noautoload = 0; // This is now controlled by the command line
+#endif
+
 #ifdef POLYMER
     int32_t rendmode = 0;
     SCRIPT_GetNumber(ud.config.scripthandle, "Screen Setup", "Polymer", &rendmode);
@@ -817,6 +820,13 @@ void CONFIG_ReadSettings(void)
 
     OSD_Exec(tempbuf);
 
+#ifdef __ANDROID__
+    if(ud.config.MusicDevice == ASS_AutoDetect || SF2_BankFile[0] == 2)
+    {
+        ud.config.MusicDevice = ASS_SF2;
+        Bstrcpy(SF2_BankFile, "soundfont.sf2");
+    }
+#endif
     ud.config.setupread = 2;
 
     return;

@@ -14,12 +14,13 @@ $(LOCAL_PATH)/mimalloc/include \
 $(LOCAL_PATH)/libxmp-lite/include \
 $(SDL_INCLUDE_PATHS) \
 $(TOP_DIR)/Clibs_OpenTouch \
+$(TOP_DIR)/Clibs_OpenTouch/libvpx/include \
 $(TOP_DIR)/Clibs_OpenTouch\raze \
 $(TOP_DIR)/MobileTouchControls  \
 $(TOP_DIR)/AudioLibs_OpenTouch/liboggvorbis/include  \
 
 
-LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DHAVE_XMP -DHAVE_VORBIS -DHAVE_FLAC -DENGINE_NAME=\"eduke32\" -DEDUKE32
+LOCAL_CFLAGS := -Wno-ignored-attributes -DRENDERTYPESDL=1 -DUSE_OPENGL -DUSE_LIBVPX  -DHAVE_XMP -DHAVE_VORBIS -DHAVE_FLAC -DENGINE_NAME=\"awol\" -DEDUKE32 -DAWOL
 LOCAL_CPPFLAGS := -fexceptions
 
 
@@ -63,10 +64,9 @@ engine_objs := \
     build/src/screentext.cpp \
     build/src/scriptfile.cpp \
     build/src/sjson.cpp \
-    build/src/smalltextfont.cpp \
+    build/src/textfont.cpp \
     build/src/softsurface.cpp \
     build/src/texcache.cpp \
-    build/src/textfont.cpp \
     build/src/tiles.cpp \
     build/src/timer.cpp \
     build/src/vfs.cpp \
@@ -78,10 +78,9 @@ engine_objs := \
     build/src/tilepacker.cpp \
     build/src/a-c.cpp \
     build/src/sdlayer.cpp \
-    build/src/smmalloc.cpp \
-    build/src/smmalloc_tls.cpp \
-    build/src/smmalloc_generic.cpp
-
+    build/src/smalltextfont.cpp \
+    build/src/zpl.cpp \
+    build/src/animvpx.cpp
 
 glad_objs := \
     glad/src/glad.c \
@@ -144,7 +143,8 @@ duke3d_game_objs := \
     duke3d/src/sector.cpp \
     duke3d/src/sounds.cpp \
     duke3d/src/text.cpp \
-    duke3d/src/dnames.cpp \
+    duke3d/src/namesdyn.cpp \
+ 	duke3d/src/soundsdyn.cpp \
 
 
 mimalloc_objs := \
@@ -174,7 +174,7 @@ LOCAL_SRC_FILES =  $(ANDROID_SRC_FILES) $(engine_objs) $(glad_objs) $(mact_objs)
 
 LOCAL_LDLIBS :=  -llog -lOpenSLES
 
-LOCAL_STATIC_LIBRARIES := logwritter flac xmp
+LOCAL_STATIC_LIBRARIES := logwritter flac xmp vpx_player
 LOCAL_SHARED_LIBRARIES := touchcontrols openal SDL2 SDL2_mixer SDL2_image saffal
 
 

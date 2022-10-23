@@ -2463,7 +2463,7 @@ static void Menu_Pre(MenuID_t cm)
                                                         musicdevice == ud.config.MusicDevice &&
                                                         opl3stereo == AL_Stereo &&
                                                         !Bstrcmp(sf2bankfile, SF2_BankFile)
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
                                                         && alsadevices.size() > 0
                                                         && alsadevices[alsadevice].clntid == ALSA_ClientID
                                                         && alsadevices[alsadevice].portid == ALSA_PortID
@@ -3336,6 +3336,9 @@ static void Menu_PreOptionListDraw(MenuEntry_t *entry, const vec2_t origin)
     }
 }
 
+#ifdef __ANDROID__
+extern bool  g_bindingbutton;
+#endif
 static int32_t Menu_PreCustom2ColScreen(MenuEntry_t *entry)
 {
     if (g_currentMenu == MENU_KEYBOARDKEYS)
@@ -3481,7 +3484,7 @@ static void Menu_RefreshSoundProperties()
     ud.config.MixRate     = FX_MixRate;
     ud.config.MusicDevice = MIDI_GetDevice();
 
-#if !defined(EDUKE32_RETAIL_MENU) && defined (__linux__)
+#if !defined(EDUKE32_RETAIL_MENU) && defined (__linux__) & !defined(__ANDROID__)
     MEOS_SOUND_ALSADEVICE.numOptions = 0;
     alsadevices = ALSADrv_MIDI_ListPorts();
     if (alsadevices.size() == 0)
@@ -3656,7 +3659,7 @@ static void Menu_EntryLinkActivate(MenuEntry_t *entry)
             MUSIC_GetSongPosition(&pos);
 
         if (ud.config.MixRate != soundrate || ud.config.NumVoices != soundvoices
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
             || (musicdevice == ASS_ALSA && (size_t)alsadevice < alsadevices.size() &&
                 (ALSA_ClientID != alsadevices[alsadevice].clntid || ALSA_PortID != alsadevices[alsadevice].portid))
 #endif
@@ -3665,7 +3668,7 @@ static void Menu_EntryLinkActivate(MenuEntry_t *entry)
             S_MusicShutdown();
             S_SoundShutdown();
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
             ALSA_ClientID = alsadevices[alsadevice].clntid;
             ALSA_PortID = alsadevices[alsadevice].portid;
 #endif
@@ -3681,7 +3684,7 @@ static void Menu_EntryLinkActivate(MenuEntry_t *entry)
         if (ud.config.MusicToggle)
         {
             int const needsReInit = (ud.config.MusicDevice != musicdevice || (musicdevice == ASS_SF2 && Bstrcmp(SF2_BankFile, sf2bankfile))
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
                 || (musicdevice == ASS_ALSA && (size_t)alsadevice < alsadevices.size() &&
                     (ALSA_ClientID != alsadevices[alsadevice].clntid || ALSA_PortID != alsadevices[alsadevice].portid))
 #endif
@@ -4905,11 +4908,6 @@ static void Menu_ChangingTo(Menu_t * m)
             m->parentID = g_previousMenu;
         break;
     }
-
-#ifdef __ANDROID__
-    if (m->menuID == MENU_TOUCHBUTTONS)
-        AndroidToggleButtonEditor();
-#endif
 
     switch (m->type)
     {
@@ -7591,6 +7589,9 @@ static void Menu_RunInput(Menu_t *cm)
                     }
                     else if (Menu_PreCustom2ColScreen(currentry))
                         ((MenuCustom2Col_t*)currentry->entry)->screenOpen = 0;
+#ifdef __ANDROID__
+					g_bindingbutton = ((MenuCustom2Col_t*)currentry->entry)->screenOpen;
+#endif
                 }
             }
 

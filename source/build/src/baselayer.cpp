@@ -9,6 +9,9 @@
 #include "polymost.h"
 #include "renderlayer.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 // video
 #ifdef _WIN32
 #include "winbits.h"

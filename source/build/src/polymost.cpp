@@ -5,6 +5,15 @@ Ken Silverman's official web site: http://www.advsys.net/ken
 "POLYMOST2" changes Copyright (c) 2018, Alex Dawson
 **************************************************************************************************/
 
+#define USE_OPENGL
+char const * polymost1Vert  =
+#include "polymost1Vert.glsl"
+;
+
+
+char const * polymost1Frag =
+#include "polymost1Frag.glsl"
+;
 
 #ifdef USE_OPENGL
 
@@ -16,6 +25,8 @@ Ken Silverman's official web site: http://www.advsys.net/ken
 #include "polymost.h"
 #include "microprofile.h"
 #include "tilepacker.h"
+#include <android/log.h>
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO,"JNITouchControlsUtils", __VA_ARGS__))
 
 extern char textfont[2048], smalltextfont[2048];
 
@@ -106,15 +117,11 @@ struct glfiltermodes glfiltermodes[NUMGLFILTERMODES] =
 int32_t glanisotropy = 0;            // 0 = maximum supported by card
 int32_t gltexfiltermode = TEXFILTER_OFF;
 
-#ifdef EDUKE32_GLES
-int32_t glusetexcompr = 2;
-int32_t glusetexcache = 0, glusememcache = 0;
-#else
 int32_t glusetexcompr = 1;
 int32_t glusetexcache = 2, glusememcache = 1;
 int32_t r_polygonmode = 0;     // 0:GL_FILL,1:GL_LINE,2:GL_POINT //FUK
 static int32_t lastglpolygonmode = 0; //FUK
-#endif
+
 #ifdef USE_GLEXT
 int32_t r_detailmapping = 1;
 int32_t r_glowmapping = 1;
@@ -583,9 +590,6 @@ void polymost_glreset()
 #endif
 }
 
-#if defined EDUKE32_GLES
-static void Polymost_DetermineTextureFormatSupport(void);
-#endif
 
 // reset vertex pointers to polymost default
 void polymost_resetVertexPointers()
@@ -593,6 +597,10 @@ void polymost_resetVertexPointers()
     polymost_outputGLDebugMessage(3, "polymost_resetVertexPointers()");
 
     glBindBuffer(GL_ARRAY_BUFFER, drawpolyVertsID);
+#ifdef __ANDROID__ // This is needed to stop GL4ES library causing crash in glDrawArray
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float) * 5, 0);
+#endif
 
     glVertexPointer(3, GL_FLOAT, 5*sizeof(float), 0);
     glTexCoordPointer(2, GL_FLOAT, 5*sizeof(float), (GLvoid*) (3*sizeof(float)));
@@ -679,6 +687,7 @@ static void polymost_setCurrentShaderProgram(uint32_t programID)
     polymost1RotMatrixLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_rotMatrix");
     polymost1ShadeInterpolateLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_shadeInterpolate");
 
+    //set the uniforms to the current values
     //set the uniforms to the current values
     glUniform4f(polymost1TexturePosSizeLoc, polymost1TexturePosSize.x, polymost1TexturePosSize.y, polymost1TexturePosSize.z, polymost1TexturePosSize.w);
     glUniform2f(polymost1HalfTexelSizeLoc, polymost1HalfTexelSize.x, polymost1HalfTexelSize.y);
@@ -890,10 +899,12 @@ void polymost_activeTexture(GLenum texture)
 //POGOTODO: replace this and polymost_activeTexture with proper draw call organization
 void polymost_bindTexture(GLenum target, uint32_t textureID)
 {
+    /*
     if (currentTextureID != textureID ||
         textureID == 0 ||
         currentActiveTexture != GL_TEXTURE0 ||
         videoGetRenderMode() != REND_POLYMOST)
+        */
     {
         glBindTexture(target, textureID);
         if (currentActiveTexture == GL_TEXTURE0)
@@ -964,6 +975,11 @@ void polymost_glinit()
 
     //POGOTODO: require a max texture size >= 2048
 
+#ifdef USE_GLES2
+    r_persistentStreamBuffer = 0;
+    r_detailmapping = 0;
+    r_glowmapping =0; // Makes AWOL crash on some devices (note 20)
+#endif
     persistentStreamBuffer = r_persistentStreamBuffer;
     drawpolyVertsBufferLength = r_drawpolyVertsBufferLength;
 
@@ -988,7 +1004,9 @@ void polymost_glinit()
     else
     {
         drawpolyVerts = defaultDrawpolyVertsArray;
+#ifndef USE_GLES2
         glBufferData(GL_ARRAY_BUFFER, drawpolyVertsBufferLength*sizeof(float)*5, NULL, GL_STREAM_DRAW);
+#endif
     }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -999,6 +1017,11 @@ void polymost_glinit()
     if (tilesheetSize > 8192)
         tilesheetSize = 8192;
 #endif
+
+#ifdef USE_GLES2 // Some GPUs with 8192 sized textures could crash when trying to go a glTexSubImage2D  because the GPU would copy the whole image and save it for a few frames
+	tilesheetSize = 2048;
+#endif
+
     tilesheetHalfTexelSize = { 0.5f/tilesheetSize, 0.5f/tilesheetSize };
     vec2_t maxTexDimensions = { tilesheetSize, tilesheetSize };
     char allPacked = false;
@@ -1196,9 +1219,7 @@ void polymost_glinit()
     texcache_setupmemcache();
     texcache_checkgarbage();
 
-#if defined EDUKE32_GLES
-    Polymost_DetermineTextureFormatSupport();
-#endif
+
 }
 
 void polymost_init()
@@ -1518,199 +1539,15 @@ static void fixtransparency(coltype *dapic, vec2_t dasiz, vec2_t dasiz2, int32_t
     }
 }
 
-#if defined EDUKE32_GLES
-// sorted first in increasing order of size, then in decreasing order of quality
-static int32_t const texfmts_rgb_mask[] = { GL_RGB5_A1, GL_RGBA, 0 };
-static int32_t const texfmts_rgb[] = { GL_RGB565, GL_RGB5_A1, GL_RGB, GL_RGBA, 0 };
-static int32_t const texfmts_rgba[] = { GL_RGBA4, GL_RGBA, 0 } ;
-
-static int32_t texfmt_rgb_mask;
-static int32_t texfmt_rgb;
-static int32_t texfmt_rgba;
-
-#if defined EDUKE32_IOS
-static int32_t const comprtexfmts_rgb[] = { GL_ETC1_RGB8_OES, 0 };
-static int32_t const comprtexfmts_rgba[] = { 0 };
-static int32_t const comprtexfmts_rgb_mask[] = { 0 };
-#else
-static int32_t const comprtexfmts_rgb[] =
-{
-#ifdef GL_COMPRESSED_RGB8_ETC2
-    GL_COMPRESSED_RGB8_ETC2,
-#endif
-#ifdef GL_ETC1_RGB8_OES
-    GL_ETC1_RGB8_OES,
-#endif
-    0
-    };
-// TODO: waiting on etcpak support for ETC2 with alpha
-static int32_t const comprtexfmts_rgba[] = { /*GL_COMPRESSED_RGBA8_ETC2_EAC,*/ 0 };
-static int32_t const comprtexfmts_rgb_mask[] = { /*GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2,*/ 0 };
-#endif
-
-static int32_t comprtexfmt_rgb_mask;
-static int32_t comprtexfmt_rgb;
-static int32_t comprtexfmt_rgba;
-
-# ifdef __cplusplus
-extern "C" {
-# endif
-extern uint64_t ProcessRGB(uint8_t const *);
-extern uint64_t ProcessRGB_ETC2(uint8_t const *);
-# ifdef __cplusplus
-}
-# endif
-
-typedef uint64_t (*ETCFunction_t)(uint8_t const *);
-
-static ETCFunction_t Polymost_PickETCFunction(int32_t const comprtexfmt)
-{
-    switch (comprtexfmt)
-    {
-# ifdef GL_ETC1_RGB8_OES
-        case GL_ETC1_RGB8_OES:
-            return ProcessRGB;
-# endif
-
-# ifdef GL_COMPRESSED_RGB8_ETC2
-        case GL_COMPRESSED_RGB8_ETC2:
-            return ProcessRGB_ETC2;
-# endif
-
-# if 0
-        case GL_COMPRESSED_RGBA8_ETC2_EAC:
-            fallthrough__;
-        case GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2:
-            fallthrough__;
-# endif
-
-        default:
-            EDUKE32_UNREACHABLE_SECTION(return NULL);
-    }
-}
-
-static int Polymost_ConfirmNoGLError(void)
-{
-    GLenum checkerr, err = GL_NO_ERROR;
-    while ((checkerr = glGetError()) != GL_NO_ERROR)
-        err = checkerr;
-
-    return err == GL_NO_ERROR;
-}
-
-static int32_t Polymost_TryDummyTexture(coltype const * const pic, int32_t const * formats)
-{
-    while (*formats)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, *formats, 4,4, 0, GL_RGBA, GL_UNSIGNED_BYTE, pic);
-
-        if (Polymost_ConfirmNoGLError())
-            return *formats;
-
-        ++formats;
-    }
-
-    initputs("No texture formats supported?!\n");
-
-    return 0;
-}
-
-static int32_t Polymost_TryCompressedDummyTexture(coltype const * const pic, int32_t const * formats)
-{
-    while (*formats)
-    {
-        ETCFunction_t func = Polymost_PickETCFunction(*formats);
-        uint64_t const comprpic = func((uint8_t const *)pic);
-        jwzgles_glCompressedTexImage2D(GL_TEXTURE_2D, 0, *formats, 4,4, 0, sizeof(uint64_t), &comprpic);
-
-        if (Polymost_ConfirmNoGLError())
-            return *formats;
-
-        ++formats;
-    }
-
-    return 0;
-}
-
-static void Polymost_DetermineTextureFormatSupport(void)
-{
-    // init dummy texture to trigger possible failure of all compression modes
-    coltype pic[4*4] = { { 0, 0, 0, 0 } };
-    GLuint tex = 0;
-
-    glGenTextures(1, &tex);
-    polymost_bindTexture(GL_TEXTURE_2D, tex);
-
-    BuildGLErrorCheck(); // XXX: Clear errors.
-
-    texfmt_rgb = Polymost_TryDummyTexture(pic, texfmts_rgb);
-    texfmt_rgba = Polymost_TryDummyTexture(pic, texfmts_rgba);
-    texfmt_rgb_mask = Polymost_TryDummyTexture(pic, texfmts_rgb_mask);
-
-    comprtexfmt_rgb = Polymost_TryCompressedDummyTexture(pic, comprtexfmts_rgb);
-    comprtexfmt_rgba = Polymost_TryCompressedDummyTexture(pic, comprtexfmts_rgba);
-    comprtexfmt_rgb_mask = Polymost_TryCompressedDummyTexture(pic, comprtexfmts_rgb_mask);
-
-    glDeleteTextures(1, &tex);
-}
-#endif
 
 static void Polymost_SendTexToDriver(int32_t const doalloc,
                                      vec2_t const siz,
                                      int32_t const texfmt,
                                      coltype const * const pic,
                                      int32_t const intexfmt,
-#if defined EDUKE32_GLES
-                                     int32_t const comprtexfmt,
-                                     int32_t const texcompress_ok,
-#endif
                                      int32_t const level)
 {
-#if defined EDUKE32_GLES
-    if (texcompress_ok && comprtexfmt && (siz.x & 3) == 0 && (siz.y & 3) == 0)
-    {
-        size_t const picLength = siz.x * siz.y;
-        size_t const fourRows = siz.x << 2u;
-        GLsizei const imageSize = picLength >> 1u; // 4x4 pixels --> 8 bytes
-        uint8_t * const comprpic = (uint8_t *)Xaligned_alloc(8, imageSize);
 
-        ETCFunction_t func = Polymost_PickETCFunction(comprtexfmt);
-
-        coltype buf[4*4];
-        uint64_t * out = (uint64_t *)comprpic;
-        for (coltype const * row = pic, * const pic_end = pic + picLength; row < pic_end; row += fourRows)
-            for (coltype const * block = row, * const row_end = row + siz.x; block < row_end; block += 4)
-            {
-                buf[0] = block[0];
-                buf[1] = block[siz.x];
-                buf[2] = block[siz.x*2];
-                buf[3] = block[siz.x*3];
-                buf[4] = block[1];
-                buf[5] = block[siz.x+1];
-                buf[6] = block[siz.x*2+1];
-                buf[7] = block[siz.x*3+1];
-                buf[8] = block[2];
-                buf[9] = block[siz.x+2];
-                buf[10] = block[siz.x*2+2];
-                buf[11] = block[siz.x*3+2];
-                buf[12] = block[3];
-                buf[13] = block[siz.x+3];
-                buf[14] = block[siz.x*2+3];
-                buf[15] = block[siz.x*3+3];
-
-                *out++ = func((uint8_t const *)buf);
-            }
-
-        if (doalloc & 1)
-            jwzgles_glCompressedTexImage2D(GL_TEXTURE_2D, level, comprtexfmt, siz.x,siz.y, 0, imageSize, comprpic);
-        else
-            jwzgles_glCompressedTexSubImage2D(GL_TEXTURE_2D, level, 0,0, siz.x,siz.y, comprtexfmt, imageSize, comprpic);
-
-        Xaligned_free(comprpic);
-
-        return;
-    }
-#endif
 
 #if B_BIG_ENDIAN
     GLenum type = GL_UNSIGNED_INT_8_8_8_8;
@@ -1732,19 +1569,12 @@ void uploadtexture(int32_t doalloc, vec2_t siz, int32_t texfmt,
     const int nomiptransfix  = !!(dameth & DAMETH_NOFIX);
     const int texcompress_ok = !(dameth & DAMETH_NOTEXCOMPRESS) && (glusetexcompr == 2 || (glusetexcompr && !artimmunity));
 
-#if !defined EDUKE32_GLES
     int32_t intexfmt;
     if (texcompress_ok && glinfo.texcompr)
         intexfmt = GL_COMPRESSED_RGBA;
     else
         intexfmt = GL_RGBA8;
-#else
-    const int hasalpha  = !!(dameth & (DAMETH_HASALPHA|DAMETH_ONEBITALPHA));
-    const int onebitalpha  = !!(dameth & DAMETH_ONEBITALPHA);
 
-    int32_t const intexfmt = hasalpha ? (onebitalpha ? texfmt_rgb_mask : texfmt_rgba) : texfmt_rgb;
-    int32_t const comprtexfmt = hasalpha ? (onebitalpha ? comprtexfmt_rgb_mask : comprtexfmt_rgba) : comprtexfmt_rgb;
-#endif
 
     dameth &= ~DAMETH_UPLOADTEXTURE_MASK;
 
@@ -1757,10 +1587,6 @@ void uploadtexture(int32_t doalloc, vec2_t siz, int32_t texfmt,
         {
             gltexmaxsize = 0;
             for (; i>1; i>>=1) gltexmaxsize++;
-#ifdef EDUKE32_GLES
-            while ((1<<(gltexmaxsize-1)) > xdim)
-                gltexmaxsize--;
-#endif
         }
     }
 
@@ -1852,10 +1678,6 @@ void uploadtexture(int32_t doalloc, vec2_t siz, int32_t texfmt,
         if (j >= miplevel)
             Polymost_SendTexToDriver(doalloc, siz3, texfmt, pic,
                                      intexfmt,
-#if defined EDUKE32_GLES
-                                     comprtexfmt,
-                                     texcompress_ok,
-#endif
                                      j - miplevel);
 
         siz2 = siz3;
@@ -1872,11 +1694,11 @@ void uploadtextureindexed(int32_t doalloc, vec2_t offset, vec2_t siz, intptr_t t
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, siz.y, siz.x, 0, GL_RED, GL_UNSIGNED_BYTE, (void*) tile);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, siz.y, siz.x, 0, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) tile);
     }
     else
     {
-        glTexSubImage2D(GL_TEXTURE_2D, 0, offset.x, offset.y, siz.y, siz.x, GL_RED, GL_UNSIGNED_BYTE, (void*) tile);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, offset.x, offset.y, siz.y, siz.x, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) tile);
     }
 }
 
@@ -1954,7 +1776,7 @@ void uploadpalswap(int32_t palookupnum)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp_mode);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp_mode);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, PALSWAP_TEXTURE_SIZE, PALSWAP_TEXTURE_SIZE, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, PALSWAP_TEXTURE_SIZE, PALSWAP_TEXTURE_SIZE, 0, GL_ALPHA, GL_UNSIGNED_BYTE, NULL);
     }
 
     int32_t column = palookupnum%(PALSWAP_TEXTURE_SIZE/256);
@@ -1968,8 +1790,8 @@ void uploadpalswap(int32_t palookupnum)
     //POGO: There was a reason why having an extra row of black pixels was necessary along the edge of the palswap (I believe it affected a particular IHV/GPU).
     //      It may be worth investigating what this reason was again, but for now, make sure we properly initialize this row.
     static char blackPixels256[256] = {0};
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset+numshades, 256, 1, GL_RED, GL_UNSIGNED_BYTE, blackPixels256);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset, 256, numshades, GL_RED, GL_UNSIGNED_BYTE, palookup[palookupnum]);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset+numshades, 256, 1, GL_ALPHA, GL_UNSIGNED_BYTE, blackPixels256);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 256*column, rowOffset, 256, numshades, GL_ALPHA, GL_UNSIGNED_BYTE, palookup[palookupnum]);
 }
 
 
@@ -2343,7 +2165,7 @@ void gloadtile_art(int32_t dapic, int32_t dapal, int32_t tintpalnum, int32_t das
     pth->hicr = NULL;
     pth->siz = tsiz;
 
-#if defined USE_GLEXT && !defined EDUKE32_GLES
+#if defined USE_GLEXT && !defined USE_GLES2
     if (!gotcache && glinfo.texcompr && glusetexcache && glusetexcompr == 2 && dapic < MAXUSERTILES)
     {
         cachead.quality = 0;
@@ -2672,7 +2494,7 @@ int32_t gloadtile_hi(int32_t dapic,int32_t dapalnum, int32_t facen, hicreplctyp 
     pth->hicr = hicr;
     pth->siz = tsiz;
 
-#if defined USE_GLEXT && !defined EDUKE32_GLES
+#if defined USE_GLEXT && !defined USE_GLES2
     if (!gotcache && glinfo.texcompr && glusetexcache && !(hicr->flags & HICR_NOTEXCOMPRESS) &&
         (glusetexcompr == 2 || (glusetexcompr && !(hicr->flags & HICR_ARTIMMUNITY))))
     {
@@ -3544,7 +3366,9 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
                 }
                 else
                 {
+#ifndef USE_GLES2
                     glBufferData(GL_ARRAY_BUFFER, sizeof(float)*5*drawpolyVertsBufferLength, NULL, GL_STREAM_DRAW);
+#endif
                     drawpolyVertsOffset = 0;
                 }
             }
@@ -3568,13 +3392,22 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
                 drawpolyVerts[(off+i)*5+3] = (p.u * r - du0 + uoffs) * invtsiz2.x;
                 drawpolyVerts[(off+i)*5+4] = p.v * r * invtsiz2.y;
             }
+#ifdef USE_GLES2
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+            glVertexPointer(3, GL_FLOAT, 5 * sizeof(float), drawpolyVerts + off * 5 );
+            glTexCoordPointer(2, GL_FLOAT, 5 * sizeof(float),  drawpolyVerts  + (off *5) + 3);
+
+            glDrawArrays(GL_TRIANGLE_FAN, 0, npoints);
+#else
             if (!persistentStreamBuffer)
             {
                 glBufferSubData(GL_ARRAY_BUFFER, drawpolyVertsOffset*sizeof(float)*5, nn*sizeof(float)*5, drawpolyVerts);
             }
+
             glDrawArrays(GL_TRIANGLE_FAN, drawpolyVertsOffset, nn);
             drawpolyVertsOffset += nn;
+#endif
         }
     }
     else
@@ -3593,7 +3426,9 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
             }
             else
             {
+#ifndef USE_GLES2
                 glBufferData(GL_ARRAY_BUFFER, sizeof(float)*5*drawpolyVertsBufferLength, NULL, GL_STREAM_DRAW);
+#endif
                 drawpolyVertsOffset = 0;
             }
         }
@@ -3614,12 +3449,21 @@ static void polymost_drawpoly(vec2f_t const * const dpxy, int32_t const n, int32
             drawpolyVerts[(off+i)*5+4] = vv[i] * r * scale.y;
         }
 
+#ifdef USE_GLES2
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        glVertexPointer(3, GL_FLOAT, 5 * sizeof(float), drawpolyVerts + off * 5 );
+        glTexCoordPointer(2, GL_FLOAT, 5 * sizeof(float),  drawpolyVerts  + (off *5) + 3);
+
+        glDrawArrays(GL_TRIANGLE_FAN, 0, npoints);
+#else
         if (!persistentStreamBuffer)
         {
             glBufferSubData(GL_ARRAY_BUFFER, drawpolyVertsOffset*sizeof(float)*5, npoints*sizeof(float)*5, drawpolyVerts);
         }
         glDrawArrays(GL_TRIANGLE_FAN, drawpolyVertsOffset, npoints);
         drawpolyVertsOffset += npoints;
+#endif
     }
 
 #ifdef USE_GLEXT
@@ -8552,6 +8396,7 @@ void polymost_drawsprite(int32_t snum)
                 psearchstat = 3;
                 doeditorcheck = 1;
             }
+glBindTexture(GL_TEXTURE0, 20);
             polymost_drawpoly(pxy, 4, method);
             doeditorcheck = 0;
 
@@ -9952,11 +9797,10 @@ void polymost_initosdfuncs(void)
         { "r_detailmapping","enable/disable detail mapping",(void *) &r_detailmapping, CVAR_BOOL, 0, 1 },
         { "r_glowmapping","enable/disable glow mapping",(void *) &r_glowmapping, CVAR_BOOL, 0, 1 },
 #endif
-#ifndef EDUKE32_GLES
+
         { "r_memcache","enable/disable texture cache memory cache",(void *) &glusememcache, CVAR_BOOL, 0, 1 },
         { "r_polygonmode","debugging feature",(void *) &r_polygonmode, CVAR_INT | CVAR_NOSAVE, 0, 3 },
         { "r_texcache","enable/disable OpenGL compressed texture cache",(void *) &glusetexcache, CVAR_INT, 0, 2 },
-#endif
         { "r_animsmoothing","enable/disable model animation smoothing",(void *) &r_animsmoothing, CVAR_BOOL, 0, 1 },
         { "r_anisotropy", "changes the OpenGL texture anisotropy setting (requires r_useindexedcolortextures to be off)", (void *) &glanisotropy, CVAR_INT|CVAR_FUNCPTR, 0, 16 },
         { "r_downsize","controls downsizing factor (quality) for hires textures",(void *) &r_downsize, CVAR_INT|CVAR_FUNCPTR, 0, 5 },
