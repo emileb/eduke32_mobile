@@ -5849,6 +5849,7 @@ static void G_Cleanup(void)
 void G_Shutdown(void)
 {
     CONFIG_WriteSetup(0);
+#ifndef __ANDROID__ // Don't do this as the process is killed
     S_SoundShutdown();
     S_MusicShutdown();
     CONTROL_Shutdown();
@@ -5858,7 +5859,8 @@ void G_Shutdown(void)
     FreeGroups();
     OSD_Cleanup();
     uninitgroupfile();
-    Bfflush(NULL);
+#endif    
+Bfflush(NULL);
 }
 
 /*
@@ -6491,8 +6493,10 @@ int app_main(int argc, char const* const* argv)
     G_LoadGroups(!g_noAutoLoad && !ud.setup.noautoload);
 //    flushlogwindow = 1;
 
+#ifndef __ANDROID__ // This removes the secondary path..
     if (!g_useCwd)
         G_CleanupSearchPaths();
+#endif
 
 #ifndef EDUKE32_STANDALONE
     G_SetupCheats();

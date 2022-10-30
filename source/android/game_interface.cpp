@@ -324,16 +324,23 @@ void PortableAction(int state, int action)
 			changeActionState(state, gamefunc_Alt_Weapon);
 			break;
 
-		// IONFURY
+		// AWOL
 		case PORT_ACT_RELOAD:
-			changeActionState(state, gamefunc_Steroids); // Reload is Steroids
+			if(state)
+				PortableCommand("gamefunc_reload_weapon");
 			break;
 		case PORT_ACT_MEDKIT:
-			changeActionState(state, gamefunc_MedKit);
+			if(state)
+				PortableCommand("gamefunc_use_bandages");
 			break;
-		case PORT_ACT_RADAR:
-			changeActionState(state, gamefunc_NightVision); // Radar is Nightvision
+		case PORT_ACT_ZOOM_IN:
+			if(state)
+				PortableCommand("gamefunc_aim_down_sights");
 			break;
+        case PORT_ACT_MP_SAY:
+            if(state)
+                PortableCommand("gamefunc_give_command");
+            break;
 		}
 	}
 }
@@ -407,17 +414,14 @@ extern "C"
 // Start game, does not return!
 void PortableInit(int argc, const char ** argv)
 {
-	if(gameType == RAZE_GAME_IONFURY)
-		strcpy(userFilesSubFolder, "ionfury");
-	else if(gameType == RAZE_GAME_EDUKE32)
-		strcpy(userFilesSubFolder, "eduke32");
-	else
-		strcpy(userFilesSubFolder, "unknown");
+	strcpy(userFilesSubFolder, "awol");
 
 	eduke32_android_main(argc, (char **)argv);
 }
 
 bool            g_bindingbutton = false;
+extern  bool g_screenPlay;
+
 extern playerdata_t     *const g_player;
 extern int inExtraScreens; //In screens.c
 extern int myconnectindex;
@@ -426,7 +430,7 @@ touchscreemode_t PortableGetScreenMode()
 	if(g_bindingbutton) {
 		return TS_CUSTOM;
 	}
-	else if (g_animPtr || inExtraScreens)
+	else if (g_animPtr || inExtraScreens || g_screenPlay)
 		return TS_BLANK;
 	else if(g_player[myconnectindex].ps->gm & MODE_MENU)
 		return TS_MENU;
@@ -484,6 +488,15 @@ extern "C" int blockGamepad(void);
 #define ANDROIDPITCHFACTORJOYSTICK          2000
 #define ANDROIDYAWFACTORJOYSTICK            4000
 
+void Mobile_Exec_cmd()
+{
+    if(cmd_to_run)
+    {
+        OSD_Dispatch(cmd_to_run);
+        cmd_to_run = NULL;
+    }
+}
+
 void Mobile_IN_Move(ControlInfo *input)
 {
 	int blockMove = blockGamepad() & ANALOGUE_AXIS_FWD;
@@ -508,11 +521,7 @@ void Mobile_IN_Move(ControlInfo *input)
 		input->dyaw += -look_yaw_joy * 20000;
 	}
 
-	if(cmd_to_run)
-	{
-		OSD_Dispatch(cmd_to_run);
-		cmd_to_run = NULL;
-	}
+
 
 	for(int n = 0;n < 64; n++)
 	{

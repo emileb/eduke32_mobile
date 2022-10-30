@@ -1729,7 +1729,7 @@ void OSD_Puts(const char *putstr, int const nolog /*= false*/)
 
         putstr = "\nError count exceeded \"osdlogcutoff\"!\n";
     }
-    else if (!nolog && (unsigned)errorCnt < (unsigned)l.cutoff)
+    else if (!nolog && osdlog &&(unsigned)errorCnt < (unsigned)l.cutoff)
     {
         auto s = Xstrdup(putstr);
         buildvfs_fputs(OSD_StripColors(s, putstr), osdlog);
@@ -1812,6 +1812,11 @@ void OSD_Puts(const char *putstr, int const nolog /*= false*/)
 //
 void OSD_DispatchQueued(void)
 {
+#ifdef __ANDROID__
+    void Mobile_Exec_cmd();
+    Mobile_Exec_cmd();
+#endif
+
     if (!osd->history.exec)
         return;
 

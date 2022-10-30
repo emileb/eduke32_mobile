@@ -1236,13 +1236,17 @@ static void G_ShowView(vec3_t vec, fix16_t a, fix16_t horiz, int sect, int ix1, 
     G_UpdateScreenArea();
     renderSetAspect(viewingRange, yxAspect);
 }
-
+#ifdef __ANDROID__
+bool g_screenPlay = false;
+#endif
 void Screen_Play(void)
 {
     bool running = true;
 
     I_ClearAllInput();
-
+#ifdef __ANDROID__
+    g_screenPlay = true;
+#endif
     do
     {
         gameHandleEvents();
@@ -1260,6 +1264,9 @@ void Screen_Play(void)
         videoNextPage();
         I_ClearAllInput();
     } while (running);
+#ifdef __ANDROID__
+    g_screenPlay = false;
+#endif
 }
 
 static inline void SetArray(int const arrayNum, int const arrayIndex, int const newValue)
