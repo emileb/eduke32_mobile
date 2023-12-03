@@ -237,7 +237,9 @@ static void G_LoadAddon(void);
 int32_t g_groupFileHandle;
 
 static struct strllist *CommandPaths, *CommandGrps;
-
+#ifdef __ANDROID__
+extern char userFilesSubFolder[];
+#endif
 void G_ExtPreInit(int32_t argc,char const * const * argv)
 {
     g_useCwd = G_CheckCmdSwitch(argc, argv, "-usecwd");
@@ -269,6 +271,24 @@ void G_ExtPreInit(int32_t argc,char const * const * argv)
         char *homedir;
         int32_t asperr;
 
+#ifdef __ANDROID__
+        {
+            homedir = getenv("USER_FILES");
+            Bsnprintf(cwd, ARRAY_SIZE(cwd), "%s/%s%s" ,homedir, userFilesSubFolder, "_dev");
+            asperr = addsearchpath(cwd);
+            if (asperr == -2)
+            {
+                if (buildvfs_mkdir(cwd,S_IRWXU) == 0) asperr = addsearchpath(cwd);
+                else asperr = -1;
+            }
+            if (asperr == 0)
+                buildvfs_chdir(cwd);
+
+            if(g_modDir[0] != '/') // Create the mod folder so saves work, not sure where this is supposed to be created in the engine but it wasn't for me
+                buildvfs_mkdir(g_modDir,S_IRWXU);
+       }
+
+#else
         if ((homedir = Bgethomedir()))
         {
             Bsnprintf(cwd, ARRAY_SIZE(cwd), "%s/"
@@ -290,12 +310,12 @@ void G_ExtPreInit(int32_t argc,char const * const * argv)
                 buildvfs_chdir(cwd);
             Xfree(homedir);
         }
+#endif
+
     }
 }
 
-#ifdef __ANDROID__
-extern char userFilesSubFolder[];
-#endif
+
 
 void G_ExtInit(void)
 {
@@ -326,23 +346,7 @@ void G_ExtInit(void)
     }
 
 
-#ifdef __ANDROID__11
-    {
-            homedir = getenv("USER_FILES");
-            Bsnprintf(cwd, ARRAY_SIZE(cwd), "%s/%s%s" ,homedir, userFilesSubFolder, "_dev");
-            asperr = addsearchpath(cwd);
-            if (asperr == -2)
-            {
-                if (buildvfs_mkdir(cwd,S_IRWXU) == 0) asperr = addsearchpath(cwd);
-                else asperr = -1;
-            }
-            if (asperr == 0)
-                buildvfs_chdir(cwd);
 
-            if(g_modDir[0] != '/') // Create the mod folder so saves work, not sure where this is supposed to be created in the engine but it wasn't for me
-                buildvfs_mkdir(g_modDir,S_IRWXU);
-       }
-#endif
 
     // JBF 20031220: Because it's annoying renaming GRP files whenever I want to test different game data
 #ifndef EDUKE32_STANDALONE
