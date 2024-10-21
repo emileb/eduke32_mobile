@@ -20,10 +20,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 
-#ifdef __ANDROID__
-#include "android.h"
-#endif
-
 #include "anim.h"
 #include "colmatch.h"
 #include "compat.h"
@@ -1103,16 +1099,13 @@ void G_DisplayRest(int32_t smoothratio)
             }
             else
             {
-#ifdef __ANDROID__
-                CONTROL_Android_ScrollMap(&ud.fola, &ud.folx, &ud.foly, &pp->zoom);
-#else
                 if (!ud.pause_on)
                 {
                     ud.fola += ud.folavel>>3;
                     ud.folx += (ud.folfvel*sintable[(512-ud.fola)&2047] + ud.folsvel*sintable[(ud.fola)&2047])>>14;
                     ud.foly += (ud.folfvel*sintable[(1024-ud.fola)&2047] + ud.folsvel*sintable[(ud.fola-512)&2047])>>14;
                 }
-#endif
+
                 cposx = ud.folx;
                 cposy = ud.foly;
                 cang = ud.fola;

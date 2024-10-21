@@ -317,6 +317,10 @@ static void texcache_deletefiles(void)
 
 int32_t texcache_enabled(void)
 {
+#if defined USE_GLES2
+    return 0;
+#endif
+
 #if defined USE_GLEXT && !defined EDUKE32_GLES
     if (!glinfo.texcompr || !glusetexcompr)
         return 0;
@@ -576,7 +580,7 @@ void texcache_prewritetex(texcacheheader *head)
     head->quality = B_LITTLE32(head->quality);
 }
 
-#if defined USE_GLEXT && !defined EDUKE32_GLES
+#if defined USE_GLEXT && !defined EDUKE32_GLES  && !defined USE_GLES2
 
 #define WRITEX_FAIL_ON_ERROR() if (glGetError() != GL_NO_ERROR) goto failure
 
@@ -772,7 +776,7 @@ static int32_t texcache_loadmips(const texcacheheader *head, GLenum *glerr)
 
     int32_t alloclen=0;
 
-#if !defined USE_GLEXT && defined EDUKE32_GLES
+#if !defined USE_GLEXT && defined USE_GLES2
     UNREFERENCED_PARAMETER(glerr);
     UNREFERENCED_PARAMETER(head);
 #endif
@@ -801,7 +805,7 @@ static int32_t texcache_loadmips(const texcacheheader *head, GLenum *glerr)
             midbuf   = (void *)Xrealloc(midbuf, pict.size);
         }
 
-#if defined USE_GLEXT && !defined EDUKE32_GLES
+#if defined USE_GLEXT && !defined USE_GLES2
         if (dedxtfilter(&pict, pic, midbuf, packbuf, (head->flags & CACHEAD_COMPRESSED) != 0))
         {
             TEXCACHE_FREEBUFS();

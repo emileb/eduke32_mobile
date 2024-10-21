@@ -10,7 +10,11 @@
 
 #ifdef USE_OPENGL
 
-#if !defined GEKKO && !defined EDUKE32_GLES
+#ifdef __ANDROID__
+#define USE_GLES2 1
+#endif
+
+#if !defined GEKKO
 # define DYNAMIC_GL
 # define DYNAMIC_GLEXT
 # define USE_GLEXT

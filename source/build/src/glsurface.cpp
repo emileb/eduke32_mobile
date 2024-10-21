@@ -2,7 +2,7 @@
  * glsurface.cpp
  *  A 32-bit rendering surface that can quickly blit 8-bit paletted buffers implemented in OpenGL.
  *
- * Copyright © 2018, Alex Dawson. All rights reserved.
+ * Copyright ï¿½ 2018, Alex Dawson. All rights reserved.
  */
 
 #include "glsurface.h"
@@ -70,8 +70,10 @@ bool glsurface_initialize(vec2_t bufferResolution)
     bufferSize = bufferRes.x * bufferRes.y;
 
     buffer = Xmalloc(bufferSize);
-    
+
+#ifndef USE_GLES2 
     if (!glIsBuffer(quadVertsID))
+#endif
         glGenBuffers(1, &quadVertsID);
 
     buildgl_bindBuffer(GL_ARRAY_BUFFER, quadVertsID);
@@ -94,7 +96,9 @@ bool glsurface_initialize(vec2_t bufferResolution)
 
     buildgl_activeTexture(GL_TEXTURE0);
 
+#ifndef USE_GLES2 
     if (!glIsTexture(bufferTexID))
+#endif
         glGenTextures(1, &bufferTexID);
 
     buildgl_bindTexture(GL_TEXTURE_2D, bufferTexID);
@@ -105,7 +109,7 @@ bool glsurface_initialize(vec2_t bufferResolution)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, bufferRes.x, bufferRes.y, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bufferRes.x, bufferRes.y, 0, GL_ALPHA, GL_UNSIGNED_BYTE, 0);
 
     glsurface_setPalette(curpalettefaded);
 
@@ -141,7 +145,7 @@ bool glsurface_initialize(vec2_t bufferResolution)
          void main()\n\
          {\n\
              vec4 color = texture2D(s_texture, v_texCoord.xy);\n\
-             color.r = c_paletteScale * color.r + c_paletteOffset;\n\
+             color.r = c_paletteScale * color.a + c_paletteOffset;\n\
              color.rgb = texture2D(s_palette, color.rg).rgb;\n\
              \n\
              // DEBUG \n\
@@ -158,7 +162,9 @@ bool glsurface_initialize(vec2_t bufferResolution)
                           * color;\n\
          }\n";
 
+#ifndef USE_GLES2 
     if (!glIsProgram(shaderProgramID))
+#endif
     {
         shaderProgramID = glCreateProgram();
 
@@ -252,11 +258,29 @@ void glsurface_blitBuffer()
     if (!buffer)
         return;
 
+
     if (colorCorrectionLoc != -1)
         glUniform4f(colorCorrectionLoc, g_glColorCorrection.x, g_glColorCorrection.y, g_glColorCorrection.z, g_glColorCorrection.w);
 
+#ifdef __ANDROID__ // Touch controls clobber GL state
+    buildgl_useShaderProgram(shaderProgramID);
+    glDisable(GL_BLEND);
+
     buildgl_activeTexture(GL_TEXTURE0);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bufferRes.x, bufferRes.y, GL_RED, GL_UNSIGNED_BYTE, (void*) buffer);
+    buildgl_activeTexture(GL_TEXTURE1);
+    buildgl_bindTexture(GL_TEXTURE_2D, paletteTexID);
+
+    buildgl_bindBuffer(GL_ARRAY_BUFFER, quadVertsID);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float) * 5, 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(float) * 5, (const void*) (sizeof(float) * 3));
+
+    buildgl_activeTexture(GL_TEXTURE0);
+    buildgl_bindTexture(GL_TEXTURE_2D, bufferTexID);
+#endif
+
+    buildgl_activeTexture(GL_TEXTURE0);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bufferRes.x, bufferRes.y, GL_ALPHA, GL_UNSIGNED_BYTE, (void*) buffer);
 
     glDrawArrays(GL_TRIANGLE_STRIP,
                  0,

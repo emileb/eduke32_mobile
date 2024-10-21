@@ -1,6 +1,6 @@
 // Made possible by the Build Engine linking exception.
 
-#if defined _WIN32 || defined __linux__ || defined EDUKE32_OSX
+#if (defined _WIN32 || defined __linux__ || defined EDUKE32_OSX) && !defined(__ANDROID__)
 # define VW_ENABLED
 #endif
 
