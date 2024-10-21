@@ -5188,17 +5188,6 @@ FAKE_F3:
             ud.last_overhead = ud.overhead_on;
         }
 
-#ifdef __ANDROID__
-        if (ud.overhead_on == 1)
-            ud.scrollmode = 0;
-        else if (ud.overhead_on == 2)
-        {
-            ud.scrollmode = 1;
-            ud.folx = g_player[screenpeek].ps->opos.x;
-            ud.foly = g_player[screenpeek].ps->opos.y;
-            ud.fola = g_player[screenpeek].ps->oang;
-        }
-#endif
         g_restorePalette = 1;
         G_UpdateScreenArea();
     }
@@ -6034,6 +6023,7 @@ static void G_Cleanup(void)
 void G_Shutdown(void)
 {
     CONFIG_WriteSetup(0);
+#ifndef __ANDROID__ // Don't do this as the process is killed
     S_SoundShutdown();
     S_MusicShutdown();
     CONTROL_Shutdown();
@@ -6043,6 +6033,7 @@ void G_Shutdown(void)
     FreeGroups();
     OSD_Cleanup();
     uninitgroupfile();
+#endif
     Bfflush(NULL);
 }
 
@@ -6465,6 +6456,7 @@ void Net_DedicatedServerStdin(void)
 }
 #endif
 
+
 void drawframe_do(void)
 {
     MICROPROFILE_SCOPEI("Game", EDUKE32_FUNCTION, MP_YELLOWGREEN);
@@ -6537,6 +6529,7 @@ void dukeFillInputForTic(void)
 
     localInput = {};
 }
+
 
 //void dukeCreateFrameRoutine(void)
 //{
@@ -7172,7 +7165,6 @@ MAIN_LOOP_RESTART:
                 Net_DedicatedServerStdin();
 #endif
             }
-
             //g_switchRoutine(co_drawframe);
             drawframe_do();
         }

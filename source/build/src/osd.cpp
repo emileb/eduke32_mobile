@@ -823,6 +823,7 @@ void OSD_Init(void)
     hash_init(&h_osd);
     hash_init(&h_cvars);
 
+
 #ifdef USE_MIMALLOC
     mi_register_output((mi_output_fun *)(void *)&mi_log, NULL);
 #endif
@@ -941,6 +942,10 @@ void OSD_SetParameters(int promptShade, int promptPal, int editShade, int editPa
     draw.highlight   = highlight;
 
     osd->flags |= flags;
+
+#ifdef __ANDROID__ // Always allow console on Android
+    osd->flags &= ~OSD_PROTECTED;
+#endif
 }
 
 

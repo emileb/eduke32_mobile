@@ -20,13 +20,11 @@
 // 	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // 	THE SOFTWARE.
 
-
 #ifdef USE_MIMALLOC
 # include "mimalloc-new-delete.h"
 #endif
 
 #include "compat.h"
-
 #include "smmalloc.h"
 #include <stdlib.h>
 

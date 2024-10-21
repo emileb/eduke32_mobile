@@ -50,7 +50,7 @@ Description of Ken's filter to improve LZW compression of DXT1 format by ~15%: (
 # include <unistd.h>
 #endif
 
-#ifndef EDUKE32_GLES
+
 static uint16_t dxt_hicosub(uint16_t c)
 {
     int32_t r, g, b;
@@ -68,7 +68,6 @@ static uint16_t dedxt_hicoadd(uint16_t c)
     b = ((c>> 0)+(g>>1))&31;
     return ((r<<11)+(g<<5)+b);
 }
-#endif
 
 void dxt_handle_io(int32_t len, void *midbuf, char *packbuf)
 {
@@ -142,7 +141,7 @@ int32_t dedxt_handle_io(int32_t j /* TODO: better name */,
     return 0;
 }
 
-#ifndef EDUKE32_GLES
+
 // NOTE: <pict> members are in external (little) endianness.
 int32_t dxtfilter(const texcachepicture *pict, const char *pic, void *midbuf, char *packbuf, uint32_t miplen)
 {
@@ -247,6 +246,5 @@ int32_t dedxtfilter(const texcachepicture *pict, char *pic, void *midbuf, char *
 
     return 0;
 }
-#endif
 
 #endif
