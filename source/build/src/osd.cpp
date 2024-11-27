@@ -12,6 +12,11 @@
 #include "scancodes.h"
 #include "atomiclist.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#include "LogWritter.h"
+#endif
+
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
 
@@ -1740,7 +1745,10 @@ void OSD_Puts(const char *putstr)
 {
     if (putstr[0] == 0 || !osd)
         return;
-
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO,"DUKE", "%s",putstr);
+     LogWritter_Write(putstr);
+#endif
     osd->log.m_pending.push(new AtomicLogString(Xstrdup(putstr)));
     OSD_WritePendingLines();
 }
