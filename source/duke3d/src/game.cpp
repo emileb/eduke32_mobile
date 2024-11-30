@@ -6640,7 +6640,10 @@ int app_main(int argc, char const* const* argv)
     G_MaybeAllocPlayer(0);
 
     G_CheckCommandLine(argc,argv);
-
+#ifdef __ANDROID__
+    if(g_modDir[0] != '/') // Create the mod folder so saves work, not sure where this is supposed to be created in the engine but it wasn't for me
+        buildvfs_mkdir(g_modDir,S_IRWXU);
+#endif
     // This needs to happen afterwards, as G_CheckCommandLine() is where we set
     // up the command-line-provided search paths (duh).
     G_ExtInit();
