@@ -15,7 +15,7 @@ $(LOCAL_PATH)/libxmp-lite/include \
 $(SDL_INCLUDE_PATHS) \
 $(TOP_DIR)/Clibs_OpenTouch \
 $(TOP_DIR)/Clibs_OpenTouch/libvpx/include \
-$(TOP_DIR)/Clibs_OpenTouch\raze \
+$(TOP_DIR)/Clibs_OpenTouch/raze \
 $(TOP_DIR)/MobileTouchControls  \
 $(TOP_DIR)/AudioLibs_OpenTouch/liboggvorbis/include  \
 
