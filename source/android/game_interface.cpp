@@ -26,6 +26,8 @@
 #include "function.h"
 #include "anim.h"
 
+#include "duke3d.h"
+#include "game.h"
 
 #include "gameTypes.h" // From Clibs_OpenTouch repo
 
@@ -102,6 +104,16 @@ void PortableMouse(float dx, float dy)
 
 	if(fabs(my) > 1)
 		my = 0;
+}
+
+bool PortableSetAlwaysRun(bool run)
+{
+    if(run)
+        ud.auto_run = 1;
+    else
+        ud.auto_run = 0;
+
+    return false;
 }
 
 void PortableMouseButton(int state, int button, float dx, float dy)
@@ -491,8 +503,17 @@ void Mobile_IN_Move(ControlInfo *input)
 
 	if(!blockMove)
 	{
-		input->dz -= forwardmove_android * ANDROIDMOVEFACTOR;
-		input->dx += sidemove_android * ANDROIDMOVEFACTOR;
+        float fwdSpeed = forwardmove_android;
+        float sideSpeed = sidemove_android;
+
+        if(!isPlayerRunning())
+        {
+            fwdSpeed = fwdSpeed / 2;
+            sideSpeed = sideSpeed / 2;
+        }
+
+		input->dz -= fwdSpeed * ANDROIDMOVEFACTOR;
+		input->dx += sideSpeed * ANDROIDMOVEFACTOR;
 	}
 
 	if(!blockLook)
