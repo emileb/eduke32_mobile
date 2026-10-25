@@ -259,11 +259,16 @@ void glsurface_blitBuffer()
         return;
 
 
+#ifndef __ANDROID__
     if (colorCorrectionLoc != -1)
         glUniform4f(colorCorrectionLoc, g_glColorCorrection.x, g_glColorCorrection.y, g_glColorCorrection.z, g_glColorCorrection.w);
+#endif
 
 #ifdef __ANDROID__ // Touch controls clobber GL state
     buildgl_useShaderProgram(shaderProgramID);
+    // Set after the program is bound, otherwise it goes to the touch controls' program
+    if (colorCorrectionLoc != -1)
+        glUniform4f(colorCorrectionLoc, g_glColorCorrection.x, g_glColorCorrection.y, g_glColorCorrection.z, g_glColorCorrection.w);
     glDisable(GL_BLEND);
 
     buildgl_activeTexture(GL_TEXTURE0);
