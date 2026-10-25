@@ -141,6 +141,9 @@ static FORCE_INLINE int buildvfs_exists(char const* path)
 {
 #ifdef _WIN32
     return GetFileAttributes(path) != INVALID_FILE_ATTRIBUTES;
+#elif defined __ANDROID__
+    // SAFFAL answers access() from its cached folder listing, while stat() opens the file through SAF
+    return !access(path, F_OK);
 #else
     struct Bstat st;
     return !Bstat(path, &st);
