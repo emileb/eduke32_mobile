@@ -39,6 +39,10 @@ int SF2_EffectSampleBlockSize = 16;
 
 #include "tsf.h"
 
+#ifdef __ANDROID__
+extern "C" const char *resFilePath_c;
+#endif
+
 static tsf *sf2_synth;
 char        SF2_BankFile[BMAX_PATH];
 static int  SF2_Volume = MIDI_MaxVolume;
@@ -124,7 +128,21 @@ int SF2Drv_MIDI_Init(midifuncs* const funcs)
         }
     }
 
-    int const loaded = SF2_LoadBank(filename);
+    int loaded = SF2_LoadBank(filename);
+
+#ifdef __ANDROID__
+    // Fall back to the app's soundfont when the bank isn't in the search paths (e.g. 'Run from this directory')
+    if (loaded != SF2_Ok && resFilePath_c)
+    {
+        char sf2path[BMAX_PATH];
+        Bsnprintf(sf2path, sizeof(sf2path), "%s/raze.sf2", resFilePath_c);
+
+        int32_t const opsm = pathsearchmode;
+        pathsearchmode = 1; // absolute path
+        loaded = SF2_LoadBank(sf2path);
+        pathsearchmode = opsm;
+    }
+#endif
 
     if (filename != SF2_BankFile)
         Xfree(filename);
