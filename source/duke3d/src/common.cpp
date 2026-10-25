@@ -239,6 +239,15 @@ int32_t g_groupFileHandle;
 static struct strllist *CommandPaths, *CommandGrps;
 #ifdef __ANDROID__
 extern char userFilesSubFolder[];
+
+// Game data folder from the launcher, used instead of the CWD because a SAF folder can't be chdir'd into
+static char const *G_GetAndroidGamePath(int32_t argc, char const * const * argv)
+{
+    for (int i = 1; i < argc - 1; i++)
+        if (!Bstrcasecmp(argv[i], "-game_path"))
+            return argv[i + 1];
+    return NULL;
+}
 #endif
 void G_ExtPreInit(int32_t argc,char const * const * argv)
 {
@@ -252,6 +261,11 @@ void G_ExtPreInit(int32_t argc,char const * const * argv)
     buildvfs_getcwd(g_rootDir,BMAX_PATH);
     strcat(g_rootDir,"/");
 #endif
+#ifdef __ANDROID__
+    char const *gamePath = G_GetAndroidGamePath(argc, argv);
+    if (gamePath)
+        Bsnprintf(g_rootDir, BMAX_PATH, "%s/", gamePath);
+#endif
     char cwd[BMAX_PATH];
 
 #ifdef USE_PHYSFS
@@ -261,6 +275,10 @@ void G_ExtPreInit(int32_t argc,char const * const * argv)
     if (buildvfs_getcwd(cwd, ARRAY_SIZE(cwd)) && Bstrcmp(cwd, "/") != 0)
 #endif
         addsearchpath(cwd);
+#ifdef __ANDROID__
+    if (gamePath)
+        addsearchpath(gamePath);
+#endif
 
 #if defined(_WIN32) && !defined(EDUKE32_STANDALONE)
     if (buildvfs_exists("user_profiles_enabled"))
