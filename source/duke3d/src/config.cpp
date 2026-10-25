@@ -930,7 +930,12 @@ void CONFIG_WriteSetup(uint32_t flags)
     SCRIPT_PutNumber(ud.config.scripthandle, "Screen Setup", "ScreenMode", ud.setup.fullscreen, FALSE, FALSE);
     SCRIPT_PutNumber(ud.config.scripthandle, "Screen Setup", "ScreenWidth", ud.setup.xdim, FALSE, FALSE);
 
+#ifdef __ANDROID__
+    extern int g_androidModAddon;
+    if (g_grpNamePtr && !g_addonNum && !g_androidModAddon)
+#else
     if (g_grpNamePtr && !g_addonNum)
+#endif
         SCRIPT_PutString(ud.config.scripthandle, "Setup", "SelectedGRP", g_grpNamePtr);
 
 #ifdef STARTUP_SETUP_WINDOW
