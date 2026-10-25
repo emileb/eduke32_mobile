@@ -26,6 +26,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "compat.h"
 
 extern void G_CheckCommandLine(int32_t argc, char const * const * argv);
+#ifdef __ANDROID__
+extern void G_ApplyAndroidCvars(void);
+#endif
 extern void G_ShowParameterHelp(void);
 extern void G_ShowDebugHelp(void);
 
