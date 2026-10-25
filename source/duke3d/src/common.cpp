@@ -381,8 +381,23 @@ void G_ExtInit(void)
 #endif
 }
 
+#ifdef __ANDROID__
+// Set when an official addon in the mod folder was picked, so it is not saved as the config's SelectedGRP
+int g_androidModAddon;
+#endif
+
 void G_ScanGroups(void)
 {
+#ifdef __ANDROID__
+    // Scan the mod folder too, so an official addon there (e.g. Nuclear Winter) is recognised and gets its own CON
+    char modPath[BMAX_PATH] = "";
+    if (g_modDir[0] != '/')
+    {
+        Bsnprintf(modPath, sizeof(modPath), "%s%s", g_rootDir, g_modDir);
+        if (addsearchpath(modPath) != 0)
+            modPath[0] = '\0';
+    }
+#endif
     ScanGroups();
 
     g_selectedGrp = NULL;
@@ -400,6 +415,28 @@ void G_ScanGroups(void)
 
     if (g_selectedGrp == NULL)
         g_selectedGrp = foundgrps;
+
+#ifdef __ANDROID__
+    if (modPath[0])
+    {
+        if (g_addonNum == 0)
+        {
+            for (grpfile_t const *fg = foundgrps; fg; fg=fg->next)
+            {
+                char path[BMAX_PATH];
+                Bsnprintf(path, sizeof(path), "%s/%s", modPath, fg->filename);
+                if ((fg->type->game & GAMEFLAG_ADDON) && buildvfs_exists(path))
+                {
+                    LOG_F(INFO, "Using addon %s from the mod folder.", fg->type->name);
+                    g_selectedGrp = fg;
+                    g_androidModAddon = 1;
+                    break;
+                }
+            }
+        }
+        removesearchpath(modPath);
+    }
+#endif
 }
 
 static int32_t G_TryLoadingGrp(char const * const grpfile)
