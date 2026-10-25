@@ -6796,6 +6796,9 @@ int app_main(int argc, char const* const* argv)
     CONFIG_ReadSettings();
 
     OSD_Exec("autoexec.cfg");
+#ifdef __ANDROID__
+    G_ApplyAndroidCvars(); // Launcher options override the config files and autoexec.cfg
+#endif
 
     CONFIG_SetDefaultKeys(keydefaults, true);
 

@@ -159,6 +159,33 @@ int g_screenHeightCmd = 0;
 int g_screenBppCmd = 0;
 #endif
 
+#ifdef __ANDROID__
+// -set <cvar> <value> from the launcher, applied after the config files and autoexec.cfg so they override them
+static char *g_androidCvars[64];
+static int g_numAndroidCvars;
+
+static void G_AddAndroidCvar(char const *name, char const *value)
+{
+    if (g_numAndroidCvars >= ARRAY_SSIZE(g_androidCvars))
+        return;
+
+    char buf[256];
+    Bsnprintf(buf, sizeof(buf), "%s \"%s\"", name, value);
+    g_androidCvars[g_numAndroidCvars++] = Xstrdup(buf);
+}
+
+void G_ApplyAndroidCvars(void)
+{
+    for (int i = 0; i < g_numAndroidCvars; i++)
+    {
+        initprintf("Launcher setting: %s\n", g_androidCvars[i]);
+        OSD_Dispatch(g_androidCvars[i]);
+        Xfree(g_androidCvars[i]);
+    }
+    g_numAndroidCvars = 0;
+}
+#endif
+
 void G_CheckCommandLine(int32_t argc, char const * const * argv)
 {
     int16_t i = 1, j;
@@ -284,6 +311,16 @@ void G_CheckCommandLine(int32_t argc, char const * const * argv)
                 if (!Bstrcasecmp(c+1, "game_path")) // Handled in G_ExtPreInit
                 {
                     i += 2;
+                    continue;
+                }
+                if (!Bstrcasecmp(c+1, "set"))
+                {
+                    if (argc > i+2)
+                    {
+                        G_AddAndroidCvar(argv[i+1], argv[i+2]);
+                        i += 2;
+                    }
+                    i++;
                     continue;
                 }
 #endif
