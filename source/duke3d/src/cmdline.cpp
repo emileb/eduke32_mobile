@@ -281,6 +281,11 @@ void G_CheckCommandLine(int32_t argc, char const * const * argv)
                     i++;
                     continue;
                 }
+                if (!Bstrcasecmp(c+1, "game_path")) // Handled in G_ExtPreInit
+                {
+                    i += 2;
+                    continue;
+                }
 #endif
                 if (!Bstrcasecmp(c+1, "debughelp") || !Bstrcasecmp(c+1, "-debughelp"))
                 {

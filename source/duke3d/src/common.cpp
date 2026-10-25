@@ -238,6 +238,11 @@ int32_t g_groupFileHandle;
 
 static struct strllist *CommandPaths, *CommandGrps;
 
+#ifdef __ANDROID__
+// Game data folder from the launcher, used instead of the CWD because a SAF folder can't be chdir'd into
+static char const *g_androidGamePath;
+#endif
+
 void G_ExtPreInit(int32_t argc,char const * const * argv)
 {
     g_useCwd = G_CheckCmdSwitch(argc, argv, "-usecwd");
@@ -249,6 +254,13 @@ void G_ExtPreInit(int32_t argc,char const * const * argv)
 #else
     buildvfs_getcwd(g_rootDir,BMAX_PATH);
     strcat(g_rootDir,"/");
+#endif
+#ifdef __ANDROID__
+    for (int i = 1; i < argc - 1; i++)
+        if (!Bstrcasecmp(argv[i], "-game_path"))
+            g_androidGamePath = argv[i + 1];
+    if (g_androidGamePath)
+        Bsnprintf(g_rootDir, BMAX_PATH, "%s/", g_androidGamePath);
 #endif
 }
 
@@ -272,6 +284,10 @@ void G_ExtInit(void)
     if (buildvfs_getcwd(cwd, ARRAY_SIZE(cwd)) && Bstrcmp(cwd, "/") != 0)
 #endif
         addsearchpath(cwd);
+#ifdef __ANDROID__
+    if (g_androidGamePath)
+        addsearchpath(g_androidGamePath);
+#endif
 
     if (CommandPaths)
     {
