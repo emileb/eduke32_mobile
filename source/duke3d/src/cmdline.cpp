@@ -302,7 +302,8 @@ void G_CheckCommandLine(int32_t argc, char const * const * argv)
                     if (argc > i+1)
                     {
                         initprintf("Adding secondary path: %s\n", argv[i+1]);
-                        addsearchpath_user(argv[i+1], SEARCHPATH_REMOVE);
+                        // Kept past G_CleanupSearchPaths so loose files next to the GRP (CONs, DEFs, ART, maps) stay reachable
+                        addsearchpath(argv[i+1]);
                         i++;
                     }
                     i++;
