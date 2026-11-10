@@ -6496,7 +6496,17 @@ int app_main(int argc, char const* const* argv)
     }
     else
 #endif
+#ifdef __ANDROID__
+    {
+        // Log to user_files, not the game folder
+        void G_AndroidUserFile(char *buf, size_t size, const char *file);
+        char logPath[BMAX_PATH];
+        G_AndroidUserFile(logPath, sizeof(logPath), APPBASENAME ".log");
+        OSD_SetLogFile(logPath);
+    }
+#else
     OSD_SetLogFile(APPBASENAME ".log");
+#endif
 
     osdcallbacks_t callbacks = {};
 
