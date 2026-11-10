@@ -6592,7 +6592,17 @@ int app_main(int argc, char const* const* argv)
 
     G_ExtPreInit(argc, argv);
 
+#ifdef __ANDROID__
+    {
+        // Log to user_files, not the game folder
+        void G_AndroidUserFile(char *buf, size_t size, const char *file);
+        char logPath[BMAX_PATH];
+        G_AndroidUserFile(logPath, sizeof(logPath), APPBASENAME ".log");
+        engineSetLogFile(logPath, LOG_GAME_MAX);
+    }
+#else
     engineSetLogFile(APPBASENAME ".log", LOG_GAME_MAX);
+#endif
     engineSetLogVerbosityCallback(dukeVerbosityCallback);
 
 #ifdef __APPLE__
