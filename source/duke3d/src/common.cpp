@@ -261,6 +261,18 @@ void G_ExtPreInit(int32_t argc,char const * const * argv)
 
 #ifdef __ANDROID__
 extern char userFilesSubFolder[];
+
+// Path of a file in this game's user_files folder, which is created if missing
+void G_AndroidUserFile(char *buf, size_t size, const char *file)
+{
+    const char *userFiles = getenv("USER_FILES");
+    Bsnprintf(buf, size, "%s/%s", userFiles, userFilesSubFolder);
+    for (char *p = buf + strlen(userFiles) + 1; *p; p++)
+        if (*p == '/') { *p = 0; buildvfs_mkdir(buf, S_IRWXU); *p = '/'; }
+    buildvfs_mkdir(buf, S_IRWXU);
+    size_t len = strlen(buf);
+    Bsnprintf(buf + len, size - len, "/%s", file);
+}
 #endif
 
 void G_ExtInit(void)
